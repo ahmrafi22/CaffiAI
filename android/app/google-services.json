@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "931539294796",
+    "project_id": "caffiai-88a15",
+    "storage_bucket": "caffiai-88a15.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931539294796:android:912cb8babe4266a17632e9",
+        "android_client_info": {
+          "package_name": "com.example.caffiai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuHMSBt5q2bXiqY0XBu1nkIjHYVL6Z4Zo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
