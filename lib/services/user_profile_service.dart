@@ -1,20 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_profile_model.dart';
+import 'firebase_service.dart';
 
 class UserProfileService {
-  UserProfileService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
-
-  final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  // Use centralized Firebase service
+  final _fb = firebase;
 
   Future<void> createUserDocIfMissing() async {
-    final user = _auth.currentUser;
+    final user = _fb.currentUser;
     if (user == null) return;
 
-    final docRef = _firestore.collection('users').doc(user.uid);
+    final docRef = _fb.usersCollection.doc(user.uid);
     final snapshot = await docRef.get();
 
     if (!snapshot.exists) {
@@ -37,12 +34,12 @@ class UserProfileService {
   }
 
   Stream<UserProfile?> watchProfile() {
-    final user = _auth.currentUser;
+    final user = _fb.currentUser;
     if (user == null) {
       return const Stream<UserProfile?>.empty();
     }
 
-    return _firestore.collection('users').doc(user.uid).snapshots().map((doc) {
+    return _fb.usersCollection.doc(user.uid).snapshots().map((doc) {
       if (!doc.exists) return null;
       return UserProfile.fromDoc(doc);
     });
@@ -53,7 +50,7 @@ class UserProfileService {
     String? photoUrl,
     Map<String, dynamic>? preferences,
   }) async {
-    final user = _auth.currentUser;
+    final user = _fb.currentUser;
     if (user == null) {
       throw FirebaseAuthException(
         code: 'no-current-user',
@@ -61,18 +58,25 @@ class UserProfileService {
       );
     }
 
-    final Map<String, dynamic> data = {
+    final docRef = _fb.usersCollection.doc(user.uid);
+    Map<String, dynamic> data = {
       if (displayName != null) 'displayName': displayName,
       if (photoUrl != null) 'photoUrl': photoUrl,
-      if (preferences != null) 'preferences': preferences,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
+    // Merge preferences with existing ones if updating preferences
+    if (preferences != null) {
+      final currentDoc = await docRef.get();
+      final currentData = currentDoc.data();
+      final existingPreferences =
+          (currentData?['preferences'] as Map<String, dynamic>?) ?? {};
+      existingPreferences.addAll(preferences);
+      data['preferences'] = existingPreferences;
+    }
+
     if (data.keys.length == 1) return; // only updatedAt would be set
 
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .set(data, SetOptions(merge: true));
+    await docRef.set(data, SetOptions(merge: true));
   }
 }

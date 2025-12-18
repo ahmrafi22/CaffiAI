@@ -1,7 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../main.dart';
+import '../services/firebase_service.dart';
 import '../services/user_profile_service.dart';
 
 class AuthPage extends StatefulWidget {
@@ -125,7 +126,7 @@ class _AuthPageState extends State<AuthPage> {
     });
     try {
       if (_isLogin) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        await firebase.auth.signInWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text.trim(),
         );
@@ -139,7 +140,7 @@ class _AuthPageState extends State<AuthPage> {
         );
         return;
       } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        await firebase.auth.createUserWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text.trim(),
         );
@@ -160,12 +161,15 @@ class _AuthPageState extends State<AuthPage> {
         return;
       }
     } on FirebaseAuthException catch (e) {
+      debugPrint('🔥 FirebaseAuthException: ${e.code} - ${e.message}');
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _error = '${e.code}: ${e.message}';
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('🔥 Auth Error: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (!mounted) return;
       setState(() {
         _error = e.toString();

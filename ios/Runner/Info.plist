@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Location usage description for map features -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We use your location to show nearby cafes and center the map.</string>
 </dict>
 </plist>

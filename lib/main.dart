@@ -1,11 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-
 import 'pages/home_page.dart';
+import 'pages/map_page.dart';
+import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
-import 'pages/auth_page.dart';
+import 'pages/chat_page.dart';
 import 'widgets/bottom_nav.dart';
+import 'widgets/brand_logo_title.dart';
 import 'theme/brand_colors.dart';
 
 void main() async {
@@ -83,35 +85,76 @@ class MyApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({super.key, this.initialIndex = 0});
+
+  final int initialIndex;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+  bool _showChat = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialIndex;
+    // Clamp to available tabs to avoid out-of-range values.
+    _selectedIndex = initial < 0
+        ? 0
+        : initial > 3
+        ? 3
+        : initial;
+  }
+
+  void _openChatbot() {
+    setState(() {
+      _showChat = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final body = switch (_selectedIndex) {
-      0 => const HomePage(),
-      1 => const ProfilePage(),
-      2 => const AuthPage(),
-      _ => const HomePage(),
-    };
+    final Widget body;
+    if (_showChat) {
+      body = const ChatPage();
+    } else {
+      body = switch (_selectedIndex) {
+        0 => const HomePage(),
+        1 => const MapPage(),
+        2 => const CommunityPage(),
+        3 => const ProfilePage(),
+        _ => const HomePage(),
+      };
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(''),
+        title: const BrandLogoTitle(),
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: BrandColors.latteFoam,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(2.5),
+          child: Container(
+            width: double.infinity,
+            height: 1,
+            color: BrandColors.caramel.withValues(alpha: 90),
+          ),
+        ),
       ),
       body: SafeArea(child: body),
-      bottomNavigationBar: BottomNav(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+      bottomNavigationBar: SafeArea(
+        child: BottomNav(
+          currentIndex: _showChat ? -1 : _selectedIndex,
+          onTap: (i) => setState(() {
+            _selectedIndex = i;
+            _showChat = false;
+          }),
+          onChatbotTap: _openChatbot,
+        ),
       ),
     );
   }
