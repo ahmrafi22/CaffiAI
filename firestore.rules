@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // users
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    //  admin users 
+    match /adminusers/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // cafes - public read, admin write for their own
+    match /cafes/{cafeId} {
+      // Allow anyone to read all cafes (isActive filtering done in app)
+      allow read: if true;
+      
+      // Allow authenticated admin to create a cafe only if:
+      // 1. They are authenticated
+      // 2. The ownerAdminId matches their uid
+      // 3. They don't already have a cafe (enforced in application logic)
+      allow create: if request.auth != null && 
+                       request.resource.data.ownerAdminId == request.auth.uid;
+      
+      // Allow authenticated admin to update only their own cafe
+      allow update: if request.auth != null && 
+                       resource.data.ownerAdminId == request.auth.uid &&
+                       request.resource.data.ownerAdminId == request.auth.uid;
+      
+      // Allow authenticated admin to delete only their own cafe
+      allow delete: if request.auth != null && 
+                       resource.data.ownerAdminId == request.auth.uid;
+    }
+
+    // menuItems - allow admin to manage menu items for their cafe
+    match /menuItems/{itemId} {
+      // Helper function to check if the admin owns the cafe
+      function ownerOfCafe(cafeId) {
+        return request.auth != null && 
+               get(/databases/$(database)/documents/cafes/$(cafeId)).data.ownerAdminId == request.auth.uid;
+      }
+      
+      // Allow any authenticated user to read menu items
+      allow read: if request.auth != null;
+      
+      // Allow admin to create menu items for their cafe
+      allow create: if request.auth != null && 
+                       ownerOfCafe(request.resource.data.cafeId);
+      
+      // Allow admin to update menu items for their cafe
+      allow update: if request.auth != null && 
+                       ownerOfCafe(resource.data.cafeId) &&
+                       ownerOfCafe(request.resource.data.cafeId);
+      
+      // Allow admin to delete menu items for their cafe
+      allow delete: if request.auth != null && 
+                       ownerOfCafe(resource.data.cafeId);
+    }
+
+  }
+}
