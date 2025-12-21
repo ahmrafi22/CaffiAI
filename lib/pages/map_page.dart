@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../theme/brand_colors.dart';
 import '../models/cafe_model.dart';
 import '../services/cafe_service.dart';
+import 'menu_page.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -132,31 +133,44 @@ class _MapPageState extends State<MapPage> {
                         .toList(),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Lat: ${cafe.latitude.toStringAsFixed(6)}  Lon: ${cafe.longitude.toStringAsFixed(6)}',
-                      style: const TextStyle(color: Colors.grey),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MenuPage(cafe: cafe),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: BrandColors.caramel,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        icon: const Icon(Icons.restaurant_menu),
+                        label: const Text('See Menu'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _mapController.move(
+                            LatLng(cafe.latitude, cafe.longitude),
+                            16,
+                          );
+                        },
+                        icon: const Icon(Icons.my_location),
+                        label: const Text('Center'),
+                      ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _mapController.move(
-                        LatLng(cafe.latitude, cafe.longitude),
-                        16,
-                      );
-                    },
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Center on map'),
-                  ),
                 ),
               ],
             ),

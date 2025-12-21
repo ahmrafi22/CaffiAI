@@ -42,8 +42,8 @@ service cloud.firestore {
                get(/databases/$(database)/documents/cafes/$(cafeId)).data.ownerAdminId == request.auth.uid;
       }
       
-      // Allow any authenticated user to read menu items
-      allow read: if request.auth != null;
+      // Allow anyone (authenticated or not) to read menu items
+      allow read: if true;
       
       // Allow admin to create menu items for their cafe
       allow create: if request.auth != null && 
