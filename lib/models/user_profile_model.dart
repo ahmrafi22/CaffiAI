@@ -21,6 +21,27 @@ class UserProfile {
     this.updatedAt,
   });
 
+  // Helper getters for coffee preferences
+  List<String> get coffeeTypes {
+    final types = preferences?['coffeeTypes'];
+    if (types is List) {
+      return types.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
+  String? get coffeeStrength {
+    return preferences?['coffeeStrength'] as String?;
+  }
+
+  List<String> get tasteProfiles {
+    final profiles = preferences?['tasteProfiles'];
+    if (profiles is List) {
+      return profiles.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
   factory UserProfile.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
     return UserProfile.fromMap(doc.id, data);

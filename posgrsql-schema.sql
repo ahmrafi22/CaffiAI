@@ -51,15 +51,7 @@ CREATE TABLE cafe (
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================
--- 4. MENU CATEGORIES
--- ============================
-CREATE TABLE menu_category (
-    id          BIGSERIAL PRIMARY KEY,
-    cafe_id     BIGINT NOT NULL REFERENCES cafe(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,               -- e.g. Coffee, Snacks
-    sort_order  INT DEFAULT 0
-);
+
 
 -- ============================
 -- 5. MENU ITEMS
@@ -67,16 +59,50 @@ CREATE TABLE menu_category (
 CREATE TABLE menu_item (
     id              BIGSERIAL PRIMARY KEY,
     cafe_id         BIGINT NOT NULL REFERENCES cafe(id) ON DELETE CASCADE,
-    category_id     BIGINT REFERENCES menu_category(id) ON DELETE SET NULL,
+
+    category        TEXT NOT NULL CHECK (category IN ('coffee', 'drink', 'food', 'dessert')),
+
+    -- new: a type/variant within the category
+    subcategory     TEXT NOT NULL,
+    CHECK (
+      (category = 'coffee'  AND subcategory IN ('black coffee','espresso','latte','cappuccino','americano','mocha')) OR
+      (category = 'drink'   AND subcategory IN ('smoothie','juice','soda')) OR
+      (category = 'food'    AND subcategory IN ('sandwich','cake','pastry')) OR
+      (category = 'dessert' AND subcategory IN ('brownie','muffin','ice-cream'))
+    ),
+
     name            TEXT NOT NULL,
     description     TEXT,
     base_price      NUMERIC(10,2) NOT NULL,
-    item_type       TEXT CHECK (item_type IN ('coffee', 'food', 'other')) DEFAULT 'coffee',
-    image_url       TEXT,                    -- Firebase Storage URL
+
+    image_url       TEXT,                    -- imagekit link
     is_available    BOOLEAN DEFAULT TRUE,
+
+    -- coffee-specific fields (nullable for non-coffee rows)
+    strength        TEXT,                    -- 'light' | 'medium' | 'strong'
+    CHECK (
+      (category = 'coffee' AND (strength IS NULL OR strength IN ('light','medium','strong')))
+      OR (category <> 'coffee' AND strength IS NULL)
+    ),
+
+    taste_profile   TEXT[],                  -- array of strings, multiple allowed
+    CHECK (
+      (category = 'coffee' AND (taste_profile IS NULL OR ARRAY['sweet','bitter','creamy','chocolatey','fruity','nutty','spicy','sour']::text[] @> taste_profile))
+      OR (category <> 'coffee' AND (taste_profile IS NULL OR taste_profile = '{}'))
+    ),
+
+    best_time       TEXT[],                  -- array of strings: morning/afternoon/evening/night
+    CHECK (
+      (category = 'coffee' AND (best_time IS NULL OR ARRAY['morning','afternoon','evening','night']::text[] @> best_time))
+      OR (category <> 'coffee' AND (best_time IS NULL OR best_time = '{}'))
+    ),
+
+    ai_summary      TEXT,                    -- for RAG / recommendations
+
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
 
 -- ============================
 -- 6. ORDERS (DINE-IN / PICKUP, MANUAL / AI)

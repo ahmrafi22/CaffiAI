@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseException;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../main.dart';
 import '../models/user_profile_model.dart';
 import '../services/firebase_service.dart';
@@ -19,52 +17,68 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _profileService = UserProfileService();
   final _displayNameCtrl = TextEditingController();
-  final _coffeeTypeCtrl = TextEditingController();
-  final _coffeeStrengthCtrl = TextEditingController();
-  final _temperatureCtrl = TextEditingController();
-  final ImagePicker _imagePicker = ImagePicker();
-  File? _pickedImage;
+  final List<String> _selectedCoffeeTypes = [];
+  String? _selectedCoffeeStrength;
+  final List<String> _selectedTasteProfiles = [];
   bool _saving = false;
+
+  // Available options
+  static const List<String> _coffeeTypeOptions = [
+    'Black Coffee',
+    'Espresso',
+    'Latte',
+    'Cappuccino',
+    'Americano',
+    'Mocha',
+  ];
+
+  static const List<String> _coffeeStrengthOptions = [
+    'Light',
+    'Medium',
+    'Strong',
+  ];
+
+  static const List<String> _tasteProfileOptions = [
+    'Sweet',
+    'Bitter',
+    'Creamy',
+    'Chocolatey',
+    'Fruity',
+    'Nutty',
+    'Spicy',
+    'Sour',
+  ];
 
   @override
   void dispose() {
     _displayNameCtrl.dispose();
-    _coffeeTypeCtrl.dispose();
-    _coffeeStrengthCtrl.dispose();
-    _temperatureCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-      );
-      if (image != null) {
-        setState(() {
-          _pickedImage = File(image.path);
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
-    }
+  // Helper method to capitalize each word (title case)
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   Future<void> _saveProfile(BuildContext bottomSheetContext) async {
     setState(() => _saving = true);
     try {
       final Map<String, dynamic> preferences = {};
-      if (_coffeeTypeCtrl.text.trim().isNotEmpty) {
-        preferences['coffeeType'] = _coffeeTypeCtrl.text.trim();
+      if (_selectedCoffeeTypes.isNotEmpty) {
+        preferences['coffeeTypes'] = _selectedCoffeeTypes;
       }
-      if (_coffeeStrengthCtrl.text.trim().isNotEmpty) {
-        preferences['coffeeStrength'] = _coffeeStrengthCtrl.text.trim();
+      if (_selectedCoffeeStrength != null) {
+        preferences['coffeeStrength'] = _selectedCoffeeStrength;
       }
-      if (_temperatureCtrl.text.trim().isNotEmpty) {
-        preferences['temperature'] = _temperatureCtrl.text.trim();
+      if (_selectedTasteProfiles.isNotEmpty) {
+        preferences['tasteProfiles'] = _selectedTasteProfiles;
       }
 
       await _profileService.updateProfile(
@@ -90,22 +104,25 @@ class _ProfilePageState extends State<ProfilePage> {
       ).showSnackBar(SnackBar(content: Text('Something went wrong: $e')));
     } finally {
       if (mounted) {
-        setState(() {
-          _saving = false;
-          _pickedImage = null;
-        });
+        setState(() => _saving = false);
       }
     }
   }
 
   void _openEditSheet(UserProfile profile) {
     _displayNameCtrl.text = profile.displayName ?? '';
-    _coffeeTypeCtrl.text = profile.preferences?['coffeeType']?.toString() ?? '';
-    _coffeeStrengthCtrl.text =
-        profile.preferences?['coffeeStrength']?.toString() ?? '';
-    _temperatureCtrl.text =
-        profile.preferences?['temperature']?.toString() ?? '';
-    _pickedImage = null;
+    _selectedCoffeeTypes.clear();
+    _selectedCoffeeTypes.addAll(
+      profile.coffeeTypes.map((type) => _capitalizeFirst(type)),
+    );
+    // Normalize coffee strength to match dropdown options
+    _selectedCoffeeStrength = profile.coffeeStrength != null
+        ? _capitalizeFirst(profile.coffeeStrength!)
+        : null;
+    _selectedTasteProfiles.clear();
+    _selectedTasteProfiles.addAll(
+      profile.tasteProfiles.map((taste) => _capitalizeFirst(taste)),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -117,120 +134,169 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (sheetCtx) {
         final bottomInset = MediaQuery.of(sheetCtx).viewInsets.bottom;
         final bottomPadding = MediaQuery.of(sheetCtx).padding.bottom;
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: bottomInset + bottomPadding + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Edit profile',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: BrandColors.espressoBrown,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Center(
-                  child: GestureDetector(
-                    onTap: _pickImage,
-                    child: Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundColor: BrandColors.steamedMilk,
-                          backgroundImage: _pickedImage != null
-                              ? FileImage(_pickedImage!)
-                              : (profile.photoUrl?.isNotEmpty == true
-                                        ? NetworkImage(profile.photoUrl!)
-                                        : null)
-                                    as ImageProvider?,
-                          child:
-                              _pickedImage == null &&
-                                  (profile.photoUrl?.isEmpty != false)
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: BrandColors.mocha,
-                                )
-                              : null,
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: BrandColors.caramel,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              size: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: bottomInset + bottomPadding + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Edit profile',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: BrandColors.espressoBrown,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _displayNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'Enter your name',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Coffee Types (Multi-select)
+                    const Text(
+                      'Favorite Coffee Types',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: BrandColors.espressoBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _coffeeTypeOptions.map((type) {
+                        final isSelected = _selectedCoffeeTypes.contains(type);
+                        return FilterChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setModalState(() {
+                              if (selected) {
+                                _selectedCoffeeTypes.add(type);
+                              } else {
+                                _selectedCoffeeTypes.remove(type);
+                              }
+                            });
+                          },
+                          backgroundColor: BrandColors.latteFoam,
+                          selectedColor: BrandColors.caramel.withValues(
+                            alpha: 0.3,
+                          ),
+                          checkmarkColor: BrandColors.espressoBrown,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? BrandColors.espressoBrown
+                                : BrandColors.mediumRoast,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    // Coffee Strength (Dropdown)
+                    DropdownButtonFormField<String>(
+                      value: _selectedCoffeeStrength,
+                      decoration: const InputDecoration(
+                        labelText: 'Coffee Strength',
+                        hintText: 'Select your preferred strength',
+                      ),
+                      items: _coffeeStrengthOptions.map((strength) {
+                        return DropdownMenuItem(
+                          value: strength,
+                          child: Text(strength),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setModalState(() {
+                          _selectedCoffeeStrength = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    // Taste Profiles (Multi-select)
+                    const Text(
+                      'Taste Profile Preferences',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: BrandColors.espressoBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _tasteProfileOptions.map((taste) {
+                        final isSelected = _selectedTasteProfiles.contains(
+                          taste,
+                        );
+                        return FilterChip(
+                          label: Text(taste),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setModalState(() {
+                              if (selected) {
+                                _selectedTasteProfiles.add(taste);
+                              } else {
+                                _selectedTasteProfiles.remove(taste);
+                              }
+                            });
+                          },
+                          backgroundColor: BrandColors.latteFoam,
+                          selectedColor: BrandColors.mintGreen.withValues(
+                            alpha: 0.3,
+                          ),
+                          checkmarkColor: BrandColors.espressoBrown,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? BrandColors.espressoBrown
+                                : BrandColors.mediumRoast,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _saving
+                            ? null
+                            : () => _saveProfile(sheetCtx),
+                        child: _saving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Update'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _displayNameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    hintText: 'Enter your name',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _coffeeTypeCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Coffee Type',
-                    hintText: 'e.g., Espresso, Cappuccino, Latte',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _coffeeStrengthCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Coffee Strength',
-                    hintText: 'e.g., Light, Medium, Strong',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _temperatureCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Temperature',
-                    hintText: 'e.g., Hot, Iced, Warm',
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : () => _saveProfile(sheetCtx),
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Update'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -411,10 +477,11 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 24),
               // Preferences Section
-              if (profile.preferences != null &&
-                  profile.preferences!.isNotEmpty) ...[
+              if (profile.coffeeTypes.isNotEmpty ||
+                  profile.coffeeStrength != null ||
+                  profile.tasteProfiles.isNotEmpty) ...[
                 const Text(
-                  'Preferences',
+                  'Coffee Preferences',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -422,37 +489,79 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    if (profile.preferences?['coffeeType'] != null)
-                      _PreferenceCapsule(
-                        label: profile.preferences!['coffeeType'].toString(),
-                        backgroundColor: BrandColors.mintGreen.withValues(
-                          alpha: 0.2,
-                        ),
-                        textColor: BrandColors.espressoBrown,
-                      ),
-                    if (profile.preferences?['coffeeStrength'] != null)
-                      _PreferenceCapsule(
-                        label: profile.preferences!['coffeeStrength']
-                            .toString(),
-                        backgroundColor: BrandColors.caramel.withValues(
-                          alpha: 0.15,
-                        ),
-                        textColor: BrandColors.espressoBrown,
-                      ),
-                    if (profile.preferences?['temperature'] != null)
-                      _PreferenceCapsule(
-                        label: profile.preferences!['temperature'].toString(),
-                        backgroundColor: BrandColors.mocha.withValues(
-                          alpha: 0.15,
-                        ),
-                        textColor: BrandColors.espressoBrown,
-                      ),
-                  ],
-                ),
+                // Coffee Types
+                if (profile.coffeeTypes.isNotEmpty) ...[
+                  const Text(
+                    'Favorite Types',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: BrandColors.mediumRoast,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: profile.coffeeTypes
+                        .map(
+                          (type) => _PreferenceCapsule(
+                            label: type,
+                            backgroundColor: BrandColors.caramel.withValues(
+                              alpha: 0.15,
+                            ),
+                            textColor: BrandColors.espressoBrown,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Coffee Strength
+                if (profile.coffeeStrength != null) ...[
+                  const Text(
+                    'Strength',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: BrandColors.mediumRoast,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _PreferenceCapsule(
+                    label: profile.coffeeStrength!,
+                    backgroundColor: BrandColors.mocha.withValues(alpha: 0.15),
+                    textColor: BrandColors.espressoBrown,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Taste Profiles
+                if (profile.tasteProfiles.isNotEmpty) ...[
+                  const Text(
+                    'Taste Profiles',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: BrandColors.mediumRoast,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: profile.tasteProfiles
+                        .map(
+                          (taste) => _PreferenceCapsule(
+                            label: taste,
+                            backgroundColor: BrandColors.mintGreen.withValues(
+                              alpha: 0.2,
+                            ),
+                            textColor: BrandColors.espressoBrown,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 32),
               ] else
                 const SizedBox(height: 24),
