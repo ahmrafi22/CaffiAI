@@ -380,10 +380,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: BrandColors.cinnamon.withOpacity(0.15),
+                  color: BrandColors.cinnamon.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: BrandColors.cinnamon.withOpacity(0.3),
+                    color: BrandColors.cinnamon.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -429,20 +429,26 @@ class _ProfilePageState extends State<ProfilePage> {
                     if (profile.preferences?['coffeeType'] != null)
                       _PreferenceCapsule(
                         label: profile.preferences!['coffeeType'].toString(),
-                        backgroundColor: BrandColors.mintGreen.withOpacity(0.2),
+                        backgroundColor: BrandColors.mintGreen.withValues(
+                          alpha: 0.2,
+                        ),
                         textColor: BrandColors.espressoBrown,
                       ),
                     if (profile.preferences?['coffeeStrength'] != null)
                       _PreferenceCapsule(
                         label: profile.preferences!['coffeeStrength']
                             .toString(),
-                        backgroundColor: BrandColors.caramel.withOpacity(0.15),
+                        backgroundColor: BrandColors.caramel.withValues(
+                          alpha: 0.15,
+                        ),
                         textColor: BrandColors.espressoBrown,
                       ),
                     if (profile.preferences?['temperature'] != null)
                       _PreferenceCapsule(
                         label: profile.preferences!['temperature'].toString(),
-                        backgroundColor: BrandColors.mocha.withOpacity(0.15),
+                        backgroundColor: BrandColors.mocha.withValues(
+                          alpha: 0.15,
+                        ),
                         textColor: BrandColors.espressoBrown,
                       ),
                   ],
@@ -580,7 +586,7 @@ class _OrderCard extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: BrandColors.caramel.withOpacity(0.15),
+              color: BrandColors.caramel.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: BrandColors.caramel, size: 30),

@@ -5,6 +5,7 @@ import '../services/menu_service.dart';
 import '../theme/brand_colors.dart';
 import '../widgets/menu_item_card.dart';
 import '../widgets/category_filter_chip.dart';
+import '../widgets/cart_icon_button.dart';
 
 class MenuPage extends StatefulWidget {
   final Cafe cafe;
@@ -32,6 +33,10 @@ class _MenuPageState extends State<MenuPage> {
             pinned: true,
             backgroundColor: BrandColors.espressoBrown,
             iconTheme: const IconThemeData(color: Colors.white),
+            actions: const [
+              // Cart Icon with Badge
+              CartIconButton(),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 widget.cafe.name,
@@ -59,7 +64,7 @@ class _MenuPageState extends State<MenuPage> {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withOpacity(0.7),
+                                Colors.black.withValues(alpha: 0.7),
                               ],
                             ),
                           ),

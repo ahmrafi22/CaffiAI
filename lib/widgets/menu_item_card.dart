@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/menu_item_model.dart';
+import '../services/cart_service.dart';
 import '../theme/brand_colors.dart';
 
 class MenuItemCard extends StatelessWidget {
@@ -16,7 +18,7 @@ class MenuItemCard extends StatelessWidget {
         border: Border.all(color: BrandColors.steamedMilk),
         boxShadow: [
           BoxShadow(
-            color: BrandColors.steamedMilk.withOpacity(0.3),
+            color: BrandColors.steamedMilk.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -165,6 +167,100 @@ class MenuItemCard extends StatelessWidget {
                     ),
                   ],
                 ],
+
+                // Add to Cart Button
+                const SizedBox(height: 14),
+                Consumer<CartService>(
+                  builder: (context, cartService, child) {
+                    final isInCart = cartService.isInCart(item.id);
+                    final quantity = cartService.getItemQuantity(item.id);
+
+                    if (isInCart && quantity > 0) {
+                      // Show quantity controls
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: BrandColors.lightFoam,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: BrandColors.caramel,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              onPressed: () {
+                                cartService.decreaseQuantity(item.id);
+                              },
+                              icon: const Icon(Icons.remove_rounded),
+                              color: BrandColors.caramel,
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(),
+                            ),
+                            Text(
+                              '$quantity',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: BrandColors.deepEspresso,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                cartService.increaseQuantity(item.id);
+                              },
+                              icon: const Icon(Icons.add_rounded),
+                              color: BrandColors.caramel,
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Show Add to Cart button
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          cartService.addToCart(item);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${item.name} added to cart'),
+                              backgroundColor: BrandColors.mintGreen,
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.add_shopping_cart_rounded,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          'Add to Cart',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: BrandColors.caramel,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

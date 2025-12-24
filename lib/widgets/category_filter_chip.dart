@@ -29,7 +29,7 @@ class CategoryFilterChip extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: BrandColors.caramel.withOpacity(0.3),
+                    color: BrandColors.caramel.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

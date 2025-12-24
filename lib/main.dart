@@ -1,11 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'pages/home_page.dart';
 import 'pages/map_page.dart';
 import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/chat_page.dart';
+import 'services/cart_service.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/brand_logo_title.dart';
 import 'theme/brand_colors.dart';
@@ -21,65 +23,68 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CaffiAI',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: const ColorScheme(
-          brightness: Brightness.light,
-          primary: BrandColors.caramel,
-          onPrimary: Colors.white,
-          secondary: BrandColors.mocha,
-          onSecondary: Colors.white,
-          error: BrandColors.warmRed,
-          onError: Colors.white,
-          background: BrandColors.cream,
-          onBackground: BrandColors.deepEspresso,
-          surface: BrandColors.latteFoam,
-          onSurface: BrandColors.espressoBrown,
-        ),
-        fontFamily: 'Poppins',
-        scaffoldBackgroundColor: BrandColors.cream,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: BrandColors.cream,
-          surfaceTintColor: Colors.transparent,
-          foregroundColor: BrandColors.deepEspresso,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: BrandColors.caramel,
-            foregroundColor: Colors.white,
-            textStyle: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
+    return ChangeNotifierProvider(
+      create: (context) => CartService(),
+      child: MaterialApp(
+        title: 'CaffiAI',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: const ColorScheme(
+            brightness: Brightness.light,
+            primary: BrandColors.caramel,
+            onPrimary: Colors.white,
+            secondary: BrandColors.mocha,
+            onSecondary: Colors.white,
+            error: BrandColors.warmRed,
+            onError: Colors.white,
+            background: BrandColors.cream,
+            onBackground: BrandColors.deepEspresso,
+            surface: BrandColors.latteFoam,
+            onSurface: BrandColors.espressoBrown,
+          ),
+          fontFamily: 'Poppins',
+          scaffoldBackgroundColor: BrandColors.cream,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: BrandColors.cream,
+            surfaceTintColor: Colors.transparent,
+            foregroundColor: BrandColors.deepEspresso,
+            elevation: 0,
+            centerTitle: true,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.caramel,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: BrandColors.latteFoam,
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: BrandColors.steamedMilk),
             ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: BrandColors.caramel,
+                width: 1.4,
+              ),
+            ),
+            labelStyle: const TextStyle(color: BrandColors.mediumRoast),
           ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: BrandColors.latteFoam,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: BrandColors.steamedMilk),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: BrandColors.caramel,
-              width: 1.4,
-            ),
-          ),
-          labelStyle: const TextStyle(color: BrandColors.mediumRoast),
-        ),
+        home: const MainScreen(),
       ),
-      home: const MainScreen(),
     );
   }
 }

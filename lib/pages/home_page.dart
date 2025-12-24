@@ -48,63 +48,44 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  Text(
-                    'Welcome to',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: BrandColors.mediumRoast,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'caffeai',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: BrandColors.espressoBrown,
-                      fontFamily: 'MochiyPopPOne',
-                      fontSize: 32,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Find the perfect café for your next brew, work session, or meetup.',
-                    style: TextStyle(
-                      color: BrandColors.mediumRoast,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
                   // Popular Cafes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Popular cafés',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: BrandColors.espressoBrown,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          foregroundColor: BrandColors.caramel,
-                        ),
-                        child: const Text('See all'),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.local_fire_department_rounded,
+                            color: BrandColors.caramel,
+                            size: 25,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Popular cafés',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: BrandColors.espressoBrown,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 132,
+                    height: 200,
+
                     child: ListView.separated(
+                      padding: EdgeInsets.zero,
+
                       scrollDirection: Axis.horizontal,
                       itemCount: popular.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 16),
+                      separatorBuilder: (_, _) => const SizedBox(width: 16),
                       itemBuilder: (context, index) {
                         final cafe = popular[index];
+                        final cardWidth =
+                            MediaQuery.of(context).size.width * 0.37;
                         return GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -115,14 +96,15 @@ class _HomePageState extends State<HomePage> {
                             );
                           },
                           child: Container(
-                            width: 110,
+                            width: cardWidth,
                             decoration: BoxDecoration(
                               color: BrandColors.latteFoam,
+                              border: Border.all(color: BrandColors.caramel),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: BrandColors.steamedMilk.withOpacity(
-                                    0.8,
+                                  color: BrandColors.steamedMilk.withValues(
+                                    alpha: 0.8,
                                   ),
                                   blurRadius: 16,
                                   offset: const Offset(0, 8),
@@ -134,8 +116,8 @@ class _HomePageState extends State<HomePage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Container(
-                                  width: 48,
-                                  height: 48,
+                                  width: 64,
+                                  height: 64,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: BrandColors.cream,
@@ -151,7 +133,7 @@ class _HomePageState extends State<HomePage> {
                                           child: Icon(
                                             Icons.local_cafe_rounded,
                                             color: BrandColors.caramel,
-                                            size: 26,
+                                            size: 32,
                                           ),
                                         )
                                       : null,
@@ -198,23 +180,25 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 28),
 
                   // Discover Cafes
-                  const Text(
-                    'Discover cafés',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: BrandColors.espressoBrown,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.storefront_rounded,
+                        color: BrandColors.caramel,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Discover cafés',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: BrandColors.espressoBrown,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Explore new spots by vibe, location, and budget.',
-                    style: TextStyle(
-                      color: BrandColors.mediumRoast,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
 
                   Column(
                     children: sortedCafes.map((cafe) {
@@ -242,6 +226,32 @@ class _HomePageState extends State<HomePage> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: BrandColors.cream,
+                                      image: cafe.imageUrl != null
+                                          ? DecorationImage(
+                                              image: NetworkImage(
+                                                cafe.imageUrl!,
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                    ),
+                                    child: cafe.imageUrl == null
+                                        ? const Center(
+                                            child: Icon(
+                                              Icons.local_cafe_rounded,
+                                              color: BrandColors.caramel,
+                                              size: 32,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
