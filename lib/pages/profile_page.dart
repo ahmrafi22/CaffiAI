@@ -1,11 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseException;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../main.dart';
+import '../models/order_model.dart';
 import '../models/user_profile_model.dart';
 import '../services/firebase_service.dart';
+import '../services/order_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/brand_colors.dart';
 import 'auth_page.dart';
+import 'orders_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -566,41 +570,93 @@ class _ProfilePageState extends State<ProfilePage> {
               ] else
                 const SizedBox(height: 24),
               // Recent Orders Section
-              const Text(
-                'Recent Orders',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: BrandColors.deepEspresso,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Column(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _OrderCard(
-                    coffeeType: 'Espresso',
-                    storeName: 'Brew Masters',
-                    price: 450,
-                    rating: 4.8,
-                    icon: Icons.local_cafe,
+                  const Text(
+                    'Recent Orders',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: BrandColors.deepEspresso,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _OrderCard(
-                    coffeeType: 'Cappuccino',
-                    storeName: 'Artisan Roasters',
-                    price: 525,
-                    rating: 4.6,
-                    icon: Icons.restaurant_menu,
-                  ),
-                  const SizedBox(height: 12),
-                  _OrderCard(
-                    coffeeType: 'Latte',
-                    storeName: 'Bean & Brew',
-                    price: 575,
-                    rating: 4.9,
-                    icon: Icons.local_drink,
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const OrdersPage()),
+                      );
+                    },
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(
+                        color: BrandColors.caramel,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              StreamBuilder<List<CustomerOrder>>(
+                stream: context.read<OrderService>().getUserOrdersStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(
+                          color: BrandColors.caramel,
+                        ),
+                      ),
+                    );
+                  }
+
+                  final orders = snapshot.data ?? [];
+
+                  if (orders.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: BrandColors.latteFoam,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: BrandColors.steamedMilk),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.receipt_long_rounded,
+                            size: 48,
+                            color: BrandColors.steamedMilk.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No orders yet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: BrandColors.mediumRoast,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Show only first 3 orders
+                  final recentOrders = orders.take(3).toList();
+
+                  return Column(
+                    children: recentOrders.map((order) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _RecentOrderCard(order: order),
+                      );
+                    }).toList(),
+                  );
+                },
               ),
               const SizedBox(height: 32),
               // Sign out button
@@ -663,21 +719,11 @@ class _PreferenceCapsule extends StatelessWidget {
   }
 }
 
-// Recent Order Card Widget
-class _OrderCard extends StatelessWidget {
-  final String coffeeType;
-  final String storeName;
-  final double price;
-  final double rating;
-  final IconData icon;
+// Recent Order Card Widget for Profile Page
+class _RecentOrderCard extends StatelessWidget {
+  final CustomerOrder order;
 
-  const _OrderCard({
-    required this.coffeeType,
-    required this.storeName,
-    required this.price,
-    required this.rating,
-    required this.icon,
-  });
+  const _RecentOrderCard({required this.order});
 
   @override
   Widget build(BuildContext context) {
@@ -690,7 +736,7 @@ class _OrderCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Coffee icon in circle
+          // Order icon in circle
           Container(
             width: 60,
             height: 60,
@@ -698,62 +744,122 @@ class _OrderCard extends StatelessWidget {
               color: BrandColors.caramel.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: BrandColors.caramel, size: 30),
+            child: Icon(
+              order.orderMode == OrderMode.delivery
+                  ? Icons.delivery_dining_rounded
+                  : Icons.restaurant_rounded,
+              color: BrandColors.caramel,
+              size: 30,
+            ),
           ),
           const SizedBox(width: 16),
-          // Coffee details
+          // Order details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  coffeeType,
+                  order.cafeName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: BrandColors.deepEspresso,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  storeName,
+                  order.orderMode == OrderMode.delivery
+                      ? 'Delivery'
+                      : 'Dine In',
                   style: const TextStyle(
                     fontSize: 14,
                     color: BrandColors.mediumRoast,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star,
-                      size: 16,
-                      color: BrandColors.caramel,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '(${rating.toStringAsFixed(1)})',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: BrandColors.mediumRoast,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildStatusChip(order.status),
               ],
             ),
           ),
           // Price
-          Text(
-            '\TK${price.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: BrandColors.espressoBrown,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${order.totalAmount.toStringAsFixed(0)} TK',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: BrandColors.espressoBrown,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.stars_rounded,
+                    size: 14,
+                    color: BrandColors.caramel,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '+${order.rewardPointsEarned}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: BrandColors.caramel,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(OrderStatus status) {
+    Color bgColor;
+    Color textColor;
+
+    switch (status) {
+      case OrderStatus.pending:
+        bgColor = BrandColors.caramel.withValues(alpha: 0.15);
+        textColor = BrandColors.caramel;
+        break;
+      case OrderStatus.accepted:
+      case OrderStatus.preparing:
+      case OrderStatus.ready:
+        bgColor = BrandColors.mintGreen.withValues(alpha: 0.2);
+        textColor = BrandColors.mocha;
+        break;
+      case OrderStatus.completed:
+        bgColor = BrandColors.mintGreen.withValues(alpha: 0.25);
+        textColor = BrandColors.mocha;
+        break;
+      case OrderStatus.cancelled:
+        bgColor = BrandColors.warmRed.withValues(alpha: 0.15);
+        textColor = BrandColors.warmRed;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.displayName,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
       ),
     );
   }

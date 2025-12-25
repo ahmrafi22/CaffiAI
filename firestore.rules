@@ -59,5 +59,42 @@ service cloud.firestore {
                        ownerOfCafe(resource.data.cafeId);
     }
 
+    // orders - customers can create and read their own orders, cafe admins can read/update orders for their cafe
+    match /orders/{orderId} {
+      // Helper function to check if the admin owns the cafe associated with this order
+      function isOwnerAdmin() {
+        return request.auth != null && 
+               resource.data.ownerAdminId == request.auth.uid;
+      }
+      
+      // Allow authenticated users to read their own orders
+      // Also allow cafe owners to read orders for their cafe
+      allow read: if request.auth != null && 
+                     (resource.data.userId == request.auth.uid || 
+                      resource.data.ownerAdminId == request.auth.uid);
+      
+      // Allow authenticated users to create orders (must be their own userId)
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Allow users to update their own pending orders (e.g., cancel)
+      // Allow cafe owners to update order status
+      allow update: if request.auth != null && 
+                       (resource.data.userId == request.auth.uid || 
+                        resource.data.ownerAdminId == request.auth.uid);
+      
+      // Order items subcollection
+      match /items/{itemId} {
+        // Allow read if user owns the order or is the cafe owner
+        allow read: if request.auth != null && 
+                       (get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+                        get(/databases/$(database)/documents/orders/$(orderId)).data.ownerAdminId == request.auth.uid);
+        
+        // Allow create if authenticated (items are created in batch with order, so parent doesn't exist yet)
+        // The parent order creation rule already ensures only the user can create their own order
+        allow create: if request.auth != null;
+      }
+    }
+
   }
 }

@@ -8,6 +8,7 @@ import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/chat_page.dart';
 import 'services/cart_service.dart';
+import 'services/order_service.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/brand_logo_title.dart';
 import 'theme/brand_colors.dart';
@@ -23,8 +24,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => CartService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => CartService()),
+        ChangeNotifierProvider(create: (context) => OrderService()),
+      ],
       child: MaterialApp(
         title: 'CaffiAI',
         debugShowCheckedModeBanner: false,

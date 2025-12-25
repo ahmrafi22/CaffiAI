@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'cart_icon_button.dart';
+import 'current_order_icon_button.dart';
 import '../theme/brand_colors.dart';
 
 class BrandLogoTitle extends StatelessWidget {
@@ -35,9 +36,20 @@ class BrandLogoTitle extends StatelessWidget {
             ),
           ],
         ),
-        CartIconButton(
-          iconColor: BrandColors.espressoBrown,
-          badgeColor: BrandColors.warmRed,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Current order icon - only shows when user has ongoing orders
+            const CurrentOrderIconButton(
+              iconColor: BrandColors.espressoBrown,
+              badgeColor: BrandColors.mintGreen,
+            ),
+            // Cart icon
+            CartIconButton(
+              iconColor: BrandColors.espressoBrown,
+              badgeColor: BrandColors.warmRed,
+            ),
+          ],
         ),
       ],
     );

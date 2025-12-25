@@ -117,10 +117,8 @@ CREATE TABLE customer_order (
                             'pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'
                         )),
     special_notes       TEXT,
-    table_number        TEXT,                -- for dine-in
     total_amount        NUMERIC(10,2) DEFAULT 0,
     reward_points_earned INT DEFAULT 0,
-    reward_points_spent  INT DEFAULT 0,      -- used for redemption
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -132,8 +130,7 @@ CREATE TABLE order_item (
     quantity                INT NOT NULL CHECK (quantity > 0),
     unit_price              NUMERIC(10,2) NOT NULL,
     total_price             NUMERIC(10,2) NOT NULL,
-    customizations          JSONB DEFAULT '{}'::jsonb, -- {"size": "L", "milk": "oat"}
-    from_ai_recommendation  BOOLEAN DEFAULT FALSE
+    ai_order                BOOLEAN DEFAULT FALSE
 );
 
 -- ============================

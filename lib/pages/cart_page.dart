@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/cart_service.dart';
+import '../services/firebase_service.dart';
 import '../theme/brand_colors.dart';
+import 'auth_page.dart';
+import 'checkout_page.dart';
 
 class CartPage extends StatelessWidget {
   const CartPage({super.key});
@@ -475,40 +478,98 @@ class CartPage extends StatelessWidget {
     );
   }
 
-  void _showCheckoutDialog(BuildContext context) {
+  void _showCheckoutDialog(BuildContext context) async {
+    // Check if user is logged in
+    if (firebase.currentUser == null) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AuthPage()),
+      );
+
+      // If user didn't log in, return
+      if (result == null && firebase.currentUser == null) {
+        return;
+      }
+    }
+
+    final cartService = context.read<CartService>();
+
+    if (cartService.cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Your cart is empty'),
+          backgroundColor: BrandColors.warmRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Get cafe info from the first cart item
+    final cafeId = cartService.cartItems.first.menuItem.cafeId;
+
+    // Show loading indicator
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: BrandColors.latteFoam,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: BrandColors.caramel),
-            SizedBox(width: 12),
-            Text(
-              'Checkout',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: BrandColors.deepEspresso,
-              ),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Checkout functionality is not yet implemented. This feature will allow you to place your order and make payment.',
-          style: TextStyle(color: BrandColors.mediumRoast),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: BrandColors.caramel,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: BrandColors.caramel),
       ),
     );
+
+    try {
+      // Fetch cafe details
+      final cafeDoc = await firebase.cafesCollection.doc(cafeId).get();
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // Remove loading indicator
+
+      if (!cafeDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Cafe information not found'),
+            backgroundColor: BrandColors.warmRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+        return;
+      }
+
+      final cafeData = cafeDoc.data()!;
+      final cafeName = cafeData['name'] ?? 'Unknown Cafe';
+      final ownerAdminId = cafeData['ownerAdminId'] ?? '';
+
+      // Navigate to checkout page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckoutPage(
+            cafeId: cafeId,
+            cafeName: cafeName,
+            ownerAdminId: ownerAdminId,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // Remove loading indicator
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: BrandColors.warmRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
   }
 }
