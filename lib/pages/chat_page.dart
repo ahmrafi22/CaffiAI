@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../theme/brand_colors.dart';
 import '../models/ai_chat_message_model.dart';
 import '../services/ai_chat_state_service.dart';
+import '../services/location_state_service.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -14,6 +16,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isLocationLinked = false;
 
   @override
   void initState() {
@@ -21,7 +24,17 @@ class _ChatPageState extends State<ChatPage> {
     // Scroll to bottom when widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
+      _linkLocationService();
     });
+  }
+
+  void _linkLocationService() {
+    if (!_isLocationLinked) {
+      final locationService = context.read<LocationStateService>();
+      final chatService = context.read<AIChatStateService>();
+      chatService.setLocationService(locationService);
+      _isLocationLinked = true;
+    }
   }
 
   void _scrollToBottom() {
@@ -357,19 +370,59 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.message,
-                    style: TextStyle(
-                      color: isAI ? BrandColors.espressoBrown : Colors.white,
-                      fontSize: 15,
-                      height: 1.5,
+              child: isAI
+                  ? MarkdownBody(
+                      data: message.message,
+                      styleSheet: MarkdownStyleSheet(
+                        p: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                        strong: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 15,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        code: TextStyle(
+                          backgroundColor: BrandColors.lightFoam,
+                          color: BrandColors.mocha,
+                          fontSize: 14,
+                        ),
+                        listBullet: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 15,
+                        ),
+                        h1: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h2: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h3: const TextStyle(
+                          color: BrandColors.espressoBrown,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      message.message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],

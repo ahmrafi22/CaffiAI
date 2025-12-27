@@ -3,10 +3,15 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ai_chat_message_model.dart';
 import 'ai_chat_service.dart';
+import 'weather_service.dart';
+import 'location_state_service.dart';
 
 class AIChatStateService extends ChangeNotifier {
   static const String _messagesKey = 'ai_chat_messages';
   final AIChatService _aiService = AIChatService();
+
+  // Reference to location service (will be set from outside)
+  LocationStateService? _locationService;
 
   List<AIChatMessage> _messages = [];
   bool _isLoading = false;
@@ -18,6 +23,11 @@ class AIChatStateService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;
   AIChatService get aiService => _aiService;
+
+  /// Set location service reference
+  void setLocationService(LocationStateService locationService) {
+    _locationService = locationService;
+  }
 
   AIChatStateService() {
     _loadMessages();
@@ -130,8 +140,65 @@ class AIChatStateService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Check if user is asking about weather-based coffee suggestions
+      String messageToSend = userMessage.trim();
+      final lowerMessage = messageToSend.toLowerCase();
+
+      final isWeatherRelated =
+          lowerMessage.contains('weather') ||
+          lowerMessage.contains('temperature') ||
+          lowerMessage.contains('cold') ||
+          lowerMessage.contains('hot') ||
+          lowerMessage.contains('warm') ||
+          lowerMessage.contains('rainy') ||
+          lowerMessage.contains('rain') ||
+          lowerMessage.contains('sunny') ||
+          (lowerMessage.contains('suggest') &&
+              (lowerMessage.contains('today') ||
+                  lowerMessage.contains('now'))) ||
+          (lowerMessage.contains('recommend') &&
+              (lowerMessage.contains('today') || lowerMessage.contains('now')));
+
+      // If weather-related and we have location, fetch weather and add context
+      if (isWeatherRelated) {
+        debugPrint('Weather-related query detected');
+        debugPrint('Location service: ${_locationService != null}');
+        debugPrint('Has location: ${_locationService?.hasLocation}');
+        debugPrint(
+          'Lat: ${_locationService?.latitude}, Lng: ${_locationService?.longitude}',
+        );
+
+        if (_locationService != null && _locationService!.hasLocation) {
+          final weather = await WeatherService.getWeather(
+            _locationService!.latitude!,
+            _locationService!.longitude!,
+          );
+
+          debugPrint('Weather fetched: ${weather != null}');
+          if (weather != null) {
+            final weatherContext = weather.getCoffeeRecommendationContext();
+            debugPrint('Weather context: $weatherContext');
+            messageToSend =
+                '''
+User's question: $messageToSend
+
+IMPORTANT - Current weather information for the user's location:
+$weatherContext
+
+You MUST use this weather information to give personalized coffee recommendations. Reference the actual temperature and weather conditions in your response.''';
+          }
+        } else {
+          // Location not available, tell user
+          messageToSend =
+              '''
+User's question: $messageToSend
+
+Note: I don't have access to the user's current location/weather. Ask them to enable location services or tell you their weather conditions so you can make appropriate suggestions.''';
+        }
+      }
+
       // Get AI response
-      final aiResponse = await _aiService.sendMessage(userMessage.trim());
+      final aiResponse = await _aiService.sendMessage(messageToSend);
       addMessage(aiResponse);
     } catch (e) {
       // Add error message
@@ -160,7 +227,8 @@ class AIChatStateService extends ChangeNotifier {
     addMessage(
       AIChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        message: 'Hello! I\'m CaffiAI 🍵, your personal coffee assistant. How can I help you today?',
+        message:
+            'Hello! I\'m CaffiAI 🍵, your personal coffee assistant. How can I help you today?',
         timestamp: DateTime.now(),
         isAI: true,
       ),

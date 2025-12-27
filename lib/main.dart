@@ -11,6 +11,7 @@ import 'pages/chat_page.dart';
 import 'services/cart_service.dart';
 import 'services/order_service.dart';
 import 'services/ai_chat_state_service.dart';
+import 'services/location_state_service.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/brand_logo_title.dart';
 import 'theme/brand_colors.dart';
@@ -36,6 +37,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (context) => CartService()),
         ChangeNotifierProvider(create: (context) => OrderService()),
+        ChangeNotifierProvider(create: (context) => LocationStateService()),
         ChangeNotifierProvider(create: (context) => AIChatStateService()),
       ],
       child: MaterialApp(
