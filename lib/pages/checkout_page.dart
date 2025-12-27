@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
+import '../services/location_service.dart';
 import '../theme/brand_colors.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -26,12 +27,88 @@ class _CheckoutPageState extends State<CheckoutPage> {
   final _notesController = TextEditingController();
   final _addressController = TextEditingController();
   bool _isLoading = false;
+  bool _isFetchingLocation = false;
 
   @override
   void dispose() {
     _notesController.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  /// Fetch user's current location when delivery is selected
+  Future<void> _fetchCurrentLocation() async {
+    setState(() {
+      _isFetchingLocation = true;
+    });
+
+    try {
+      final address = await LocationService.getCurrentLocationAddress();
+
+      if (address != null) {
+        _addressController.text = address;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Location detected successfully'),
+                ],
+              ),
+              backgroundColor: BrandColors.mintGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Unable to get location. Please enter manually.',
+              ),
+              backgroundColor: BrandColors.caramel,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              action: SnackBarAction(
+                label: 'Settings',
+                textColor: Colors.white,
+                onPressed: () {
+                  LocationService.openLocationSettings();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Error fetching location. Please try again.'),
+            backgroundColor: BrandColors.warmRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetchingLocation = false;
+        });
+      }
+    }
   }
 
   double get _deliveryFee =>
@@ -153,20 +230,54 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 // Delivery Address (shown only for delivery)
                 if (_selectedMode == OrderMode.delivery) ...[
                   const SizedBox(height: 20),
-                  const Text(
-                    'Delivery Address',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: BrandColors.deepEspresso,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Delivery Address',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: BrandColors.deepEspresso,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _isFetchingLocation
+                            ? null
+                            : _fetchCurrentLocation,
+                        icon: _isFetchingLocation
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    BrandColors.caramel,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.my_location_rounded, size: 18),
+                        label: Text(
+                          _isFetchingLocation
+                              ? 'Detecting...'
+                              : 'Detect Location',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: BrandColors.caramel,
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _addressController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Enter your delivery address...',
+                      hintText: 'Your delivery address will appear here...',
                       hintStyle: TextStyle(
                         color: BrandColors.mediumRoast.withValues(alpha: 0.6),
                       ),
@@ -462,6 +573,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
         setState(() {
           _selectedMode = mode;
         });
+        // Automatically fetch location when delivery is selected
+        if (mode == OrderMode.delivery) {
+          _fetchCurrentLocation();
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),

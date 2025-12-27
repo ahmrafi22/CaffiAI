@@ -3,6 +3,7 @@ import '../theme/brand_colors.dart';
 import '../services/cafe_service.dart';
 import '../models/cafe_model.dart';
 import 'menu_page.dart';
+import 'search_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -48,6 +49,48 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
+                  // Search Bar
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SearchPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: BrandColors.latteFoam,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: BrandColors.steamedMilk),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            color: BrandColors.mocha,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Search menu items...',
+                            style: TextStyle(
+                              color: BrandColors.mediumRoast.withValues(
+                                alpha: 0.6,
+                              ),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   // Popular Cafes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
