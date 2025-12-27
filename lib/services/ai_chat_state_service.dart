@@ -18,6 +18,9 @@ class AIChatStateService extends ChangeNotifier {
   // Reference to location service (will be set from outside)
   LocationStateService? _locationService;
 
+  // Temporary storage for recommendations between query and response
+  List<CoffeeRecommendation>? _pendingRecommendations;
+
   List<AIChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isInitialized = false;
@@ -75,16 +78,26 @@ class AIChatStateService extends ChangeNotifier {
       'message': message.message,
       'timestamp': message.timestamp.toIso8601String(),
       'isAI': message.isAI,
+      'recommendations': message.recommendations
+          ?.map((r) => r.toJson())
+          .toList(),
     };
   }
 
   // Convert JSON to message
   AIChatMessage _messageFromJson(Map<String, dynamic> json) {
+    List<CoffeeRecommendation>? recommendations;
+    if (json['recommendations'] != null) {
+      recommendations = (json['recommendations'] as List)
+          .map((r) => CoffeeRecommendation.fromJson(r as Map<String, dynamic>))
+          .toList();
+    }
     return AIChatMessage(
       id: json['id'] as String,
       message: json['message'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String),
       isAI: json['isAI'] as bool,
+      recommendations: recommendations,
     );
   }
 
@@ -198,7 +211,7 @@ class AIChatStateService extends ChangeNotifier {
   }
 
   /// Query coffee items matching user preferences
-  Future<List<Map<String, dynamic>>> _queryCoffeeItems(
+  Future<List<CoffeeRecommendation>> _queryCoffeeItems(
     UserProfile profile,
   ) async {
     try {
@@ -216,7 +229,7 @@ class AIChatStateService extends ChangeNotifier {
       final items = snapshot.docs
           .map((doc) => MenuItem.fromFirestore(doc))
           .toList();
-      final scoredItems = <Map<String, dynamic>>[];
+      final scoredItems = <CoffeeRecommendation>[];
 
       for (final item in items) {
         int score = 0;
@@ -273,14 +286,14 @@ class AIChatStateService extends ChangeNotifier {
             debugPrint('Error fetching cafe: $e');
           }
 
-          scoredItems.add({'item': item, 'cafe': cafe, 'score': score});
+          scoredItems.add(
+            CoffeeRecommendation(item: item, cafe: cafe, matchScore: score),
+          );
         }
       }
 
       // Sort by score (descending)
-      scoredItems.sort(
-        (a, b) => (b['score'] as int).compareTo(a['score'] as int),
-      );
+      scoredItems.sort((a, b) => b.matchScore.compareTo(a.matchScore));
 
       // Return top 5
       return scoredItems.take(5).toList();
@@ -292,7 +305,7 @@ class AIChatStateService extends ChangeNotifier {
 
   /// Format coffee recommendations for AI context
   String _formatCoffeeRecommendations(
-    List<Map<String, dynamic>> recommendations,
+    List<CoffeeRecommendation> recommendations,
     UserProfile profile,
   ) {
     if (recommendations.isEmpty) {
@@ -310,10 +323,9 @@ No matching coffee items found in the database. Provide general coffee recommend
     buffer.writeln();
 
     for (int i = 0; i < recommendations.length; i++) {
-      final data = recommendations[i];
-      final MenuItem item = data['item'];
-      final Cafe? cafe = data['cafe'];
-      final int score = data['score'];
+      final rec = recommendations[i];
+      final item = rec.item;
+      final cafe = rec.cafe;
 
       buffer.writeln('${i + 1}. **${item.name}**');
       if (cafe != null) {
@@ -338,21 +350,21 @@ No matching coffee items found in the database. Provide general coffee recommend
       if (item.description != null && item.description!.isNotEmpty) {
         buffer.writeln('   Description: ${item.description}');
       }
-      buffer.writeln('   Match Score: $score');
+      buffer.writeln('   Match Score: ${rec.matchScore}');
       buffer.writeln();
     }
 
     buffer.writeln();
     buffer.writeln('INSTRUCTIONS:');
     buffer.writeln(
-      '- Present these REAL coffee options from our database to the user',
+      '- Give a SHORT, friendly intro about why these coffees match the user',
     );
-    buffer.writeln('- Mention the specific coffee names, cafés, and details');
     buffer.writeln(
-      '- Explain WHY each option matches their query/mood/preferences',
+      '- DO NOT list coffee details - they will be shown as product cards',
     );
-    buffer.writeln('- Be enthusiastic and helpful in your recommendations');
-    buffer.writeln('- Use the match scores to prioritize recommendations');
+    buffer.writeln('- Mention 1-2 coffee names briefly to highlight top picks');
+    buffer.writeln('- Keep response concise (2-3 sentences max)');
+    buffer.writeln('- End with a question or helpful tip if appropriate');
 
     return buffer.toString();
   }
@@ -466,6 +478,9 @@ Note: I don't have access to the user's current location/weather. Ask them to en
           final recommendations = await _queryCoffeeItems(profile);
           debugPrint('Found ${recommendations.length} matching coffee items');
 
+          // Store recommendations for use in AI response
+          _pendingRecommendations = recommendations;
+
           // Format recommendations for AI
           final coffeeContext = _formatCoffeeRecommendations(
             recommendations,
@@ -485,7 +500,18 @@ Note: User profile not available. Provide general coffee recommendations and sug
 
       // Get AI response
       final aiResponse = await _aiService.sendMessage(messageToSend);
-      addMessage(aiResponse);
+
+      // Add recommendations to the AI response if we have them
+      final responseWithRecommendations = AIChatMessage(
+        id: aiResponse.id,
+        message: aiResponse.message,
+        timestamp: aiResponse.timestamp,
+        isAI: aiResponse.isAI,
+        recommendations: _pendingRecommendations,
+      );
+      _pendingRecommendations = null;
+
+      addMessage(responseWithRecommendations);
     } catch (e) {
       // Add error message
       addMessage(

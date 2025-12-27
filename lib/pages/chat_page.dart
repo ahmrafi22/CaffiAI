@@ -5,6 +5,7 @@ import '../theme/brand_colors.dart';
 import '../models/ai_chat_message_model.dart';
 import '../services/ai_chat_state_service.dart';
 import '../services/location_state_service.dart';
+import '../widgets/chat_coffee_card.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -323,108 +324,129 @@ class _MessageBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment: isAI
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: isAI
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
         children: [
-          if (isAI) ...[
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [BrandColors.mocha, BrandColors.caramel],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: BrandColors.mocha.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.coffee, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isAI ? Colors.white : BrandColors.mocha,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(isAI ? 4 : 20),
-                  topRight: Radius.circular(isAI ? 20 : 4),
-                  bottomLeft: const Radius.circular(20),
-                  bottomRight: const Radius.circular(20),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: isAI
-                  ? MarkdownBody(
-                      data: message.message,
-                      styleSheet: MarkdownStyleSheet(
-                        p: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
-                        strong: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        em: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 15,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        code: TextStyle(
-                          backgroundColor: BrandColors.lightFoam,
-                          color: BrandColors.mocha,
-                          fontSize: 14,
-                        ),
-                        listBullet: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 15,
-                        ),
-                        h1: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        h2: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        h3: const TextStyle(
-                          color: BrandColors.espressoBrown,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                  : Text(
-                      message.message,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
+          // Main message bubble
+          Row(
+            mainAxisAlignment: isAI
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isAI) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [BrandColors.mocha, BrandColors.caramel],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-            ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: BrandColors.mocha.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.coffee,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isAI ? Colors.white : BrandColors.mocha,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(isAI ? 4 : 20),
+                      topRight: Radius.circular(isAI ? 20 : 4),
+                      bottomLeft: const Radius.circular(20),
+                      bottomRight: const Radius.circular(20),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: isAI
+                      ? MarkdownBody(
+                          data: message.message,
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 15,
+                              height: 1.5,
+                            ),
+                            strong: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            em: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 15,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            code: TextStyle(
+                              backgroundColor: BrandColors.lightFoam,
+                              color: BrandColors.mocha,
+                              fontSize: 14,
+                            ),
+                            listBullet: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 15,
+                            ),
+                            h1: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h2: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h3: const TextStyle(
+                              color: BrandColors.espressoBrown,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          message.message,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.5,
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
+
+          // Coffee recommendation cards (if any)
+          if (isAI && message.hasRecommendations) ...[
+            const SizedBox(height: 16),
+            ChatCoffeeCardList(recommendations: message.recommendations!),
+          ],
         ],
       ),
     );
