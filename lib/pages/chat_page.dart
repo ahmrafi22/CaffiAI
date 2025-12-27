@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../theme/brand_colors.dart';
 import '../models/ai_chat_message_model.dart';
+import '../models/chat_order_model.dart';
 import '../services/ai_chat_state_service.dart';
 import '../services/location_state_service.dart';
 import '../widgets/chat_coffee_card.dart';
+import '../widgets/chat_order_widgets.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -193,6 +195,28 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
 
+            // Order Mode Selector (when selecting mode)
+            if (chatService.chatOrderData.state == ChatOrderState.selectingMode)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: ChatOrderModeSelector(),
+              ),
+
+            // Order Confirmation (when confirming)
+            if (chatService.chatOrderData.state ==
+                ChatOrderState.confirmingOrder)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: ChatOrderConfirmation(),
+              ),
+
+            // Order Processing (when placing order)
+            if (chatService.chatOrderData.state == ChatOrderState.processing)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: ChatOrderProcessing(),
+              ),
+
             // Loading indicator
             if (chatService.isLoading)
               Container(
@@ -236,79 +260,126 @@ class _ChatPageState extends State<ChatPage> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: SafeArea(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        enabled:
-                            chatService.isInitialized && !chatService.isLoading,
-                        decoration: InputDecoration(
-                          hintText: 'Ask about coffee...',
-                          hintStyle: TextStyle(
-                            color: BrandColors.mediumRoast.withValues(
-                              alpha: 0.5,
+                child: chatService.chatOrderData.isActive
+                    ? _buildOrderFlowHint(chatService)
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              enabled:
+                                  chatService.isInitialized &&
+                                  !chatService.isLoading,
+                              decoration: InputDecoration(
+                                hintText: 'Ask about coffee...',
+                                hintStyle: TextStyle(
+                                  color: BrandColors.mediumRoast.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  fontSize: 14,
+                                ),
+                                filled: true,
+                                fillColor: BrandColors.lightFoam,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: const BorderSide(
+                                    color: BrandColors.mocha,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                isDense: true,
+                              ),
+                              maxLines: null,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => _sendMessage(chatService),
+                              style: const TextStyle(fontSize: 14),
                             ),
-                            fontSize: 14,
                           ),
-                          filled: true,
-                          fillColor: BrandColors.lightFoam,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: const BoxDecoration(
                               color: BrandColors.mocha,
-                              width: 1.5,
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              onPressed:
+                                  (chatService.isInitialized &&
+                                      !chatService.isLoading)
+                                  ? () => _sendMessage(chatService)
+                                  : null,
+                              icon: const Icon(Icons.send_rounded, size: 20),
+                              color: Colors.white,
+                              constraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
+                              padding: EdgeInsets.zero,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          isDense: true,
-                        ),
-                        maxLines: null,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _sendMessage(chatService),
-                        style: const TextStyle(fontSize: 14),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      decoration: const BoxDecoration(
-                        color: BrandColors.mocha,
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        onPressed:
-                            (chatService.isInitialized &&
-                                !chatService.isLoading)
-                            ? () => _sendMessage(chatService)
-                            : null,
-                        icon: const Icon(Icons.send_rounded, size: 20),
-                        color: Colors.white,
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  /// Build a hint widget during order flow
+  Widget _buildOrderFlowHint(AIChatStateService chatService) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: BrandColors.lightFoam,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: BrandColors.mocha.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: BrandColors.mocha.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Complete your order above or tap Cancel to continue chatting',
+              style: TextStyle(
+                fontSize: 13,
+                color: BrandColors.mediumRoast.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => chatService.cancelChatOrder(),
+            style: TextButton.styleFrom(
+              foregroundColor: BrandColors.warmRed,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

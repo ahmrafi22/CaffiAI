@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/order_model.dart';
 import '../models/cart_item_model.dart';
+import '../models/menu_item_model.dart';
 import 'firebase_service.dart';
 
 class OrderService extends ChangeNotifier {
@@ -116,6 +117,90 @@ class OrderService extends ChangeNotifier {
     await batch.commit();
 
     debugPrint('Order created: $orderId with $rewardPoints reward points');
+
+    return order;
+  }
+
+  /// Create an order from AI chatbot recommendation
+  Future<CustomerOrder> createAIOrder({
+    required MenuItem menuItem,
+    required String cafeId,
+    required String cafeName,
+    required String ownerAdminId,
+    required OrderMode orderMode,
+    String? deliveryAddress,
+    int quantity = 1,
+  }) async {
+    final user = _fb.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in to create an order');
+    }
+
+    // Validate delivery address if delivery mode
+    if (orderMode == OrderMode.delivery &&
+        (deliveryAddress == null || deliveryAddress.trim().isEmpty)) {
+      throw Exception('Delivery address is required for delivery orders');
+    }
+
+    // Calculate totals
+    final subtotal = menuItem.basePrice * quantity;
+    final fee = orderMode == OrderMode.delivery ? deliveryFee : 0.0;
+    final finalTotal = subtotal + fee;
+    final rewardPoints = calculateRewardPoints(subtotal);
+
+    // Create order document
+    final orderRef = _ordersCollection.doc();
+    final orderId = orderRef.id;
+
+    final order = CustomerOrder(
+      id: orderId,
+      userId: user.uid,
+      cafeId: cafeId,
+      cafeName: cafeName,
+      ownerAdminId: ownerAdminId,
+      orderMode: orderMode,
+      orderSource: OrderSource.aiChat, // Mark as AI order
+      status: OrderStatus.pending,
+      specialNotes: 'Ordered via AI Chatbot',
+      subtotalAmount: subtotal,
+      deliveryFee: fee,
+      totalAmount: finalTotal,
+      rewardPointsEarned: rewardPoints,
+      deliveryAddress: deliveryAddress,
+    );
+
+    // Use batch write for atomicity
+    final batch = _fb.firestore.batch();
+
+    // Set order document
+    batch.set(orderRef, order.toFirestore());
+
+    // Add order item as subcollection
+    final itemRef = _orderItemsCollection(orderId).doc();
+    final orderItem = OrderItem(
+      id: itemRef.id,
+      orderId: orderId,
+      menuItemId: menuItem.id,
+      menuItemName: menuItem.name,
+      quantity: quantity,
+      unitPrice: menuItem.basePrice,
+      totalPrice: subtotal,
+      aiOrder: true, // Mark as AI ordered item
+    );
+    batch.set(itemRef, orderItem.toFirestore());
+
+    // Update user's reward points
+    final userRef = _fb.usersCollection.doc(user.uid);
+    batch.update(userRef, {
+      'rewardPoints': FieldValue.increment(rewardPoints),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // Commit the batch
+    await batch.commit();
+
+    debugPrint('AI Order created: $orderId with $rewardPoints reward points');
+    notifyListeners();
 
     return order;
   }

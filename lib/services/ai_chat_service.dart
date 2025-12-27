@@ -27,7 +27,7 @@ class AIChatService {
       }
 
       _model = GenerativeModel(
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         apiKey: apiKey,
         systemInstruction: Content.system(
           'You are CaffiAI, a friendly and knowledgeable coffee assistant for a café ordering app. '

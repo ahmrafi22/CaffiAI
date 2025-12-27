@@ -6,20 +6,30 @@ import '../models/ai_chat_message_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/menu_item_model.dart';
 import '../models/cafe_model.dart';
+import '../models/chat_order_model.dart';
+import '../models/order_model.dart';
 import 'ai_chat_service.dart';
 import 'weather_service.dart';
 import 'location_state_service.dart';
+import 'order_service.dart';
 import 'firebase_service.dart';
 
 class AIChatStateService extends ChangeNotifier {
   static const String _messagesKey = 'ai_chat_messages';
   final AIChatService _aiService = AIChatService();
+  final OrderService _orderService = OrderService();
 
   // Reference to location service (will be set from outside)
   LocationStateService? _locationService;
 
   // Temporary storage for recommendations between query and response
   List<CoffeeRecommendation>? _pendingRecommendations;
+
+  // Chat order state
+  ChatOrderData _chatOrderData = ChatOrderData.initial();
+
+  // Store the last recommendations for order reference
+  List<CoffeeRecommendation> _lastRecommendations = [];
 
   List<AIChatMessage> _messages = [];
   bool _isLoading = false;
@@ -31,6 +41,8 @@ class AIChatStateService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;
   AIChatService get aiService => _aiService;
+  ChatOrderData get chatOrderData => _chatOrderData;
+  List<CoffeeRecommendation> get lastRecommendations => _lastRecommendations;
 
   /// Set location service reference
   void setLocationService(LocationStateService locationService) {
@@ -365,6 +377,9 @@ No matching coffee items found in the database. Provide general coffee recommend
     buffer.writeln('- Mention 1-2 coffee names briefly to highlight top picks');
     buffer.writeln('- Keep response concise (2-3 sentences max)');
     buffer.writeln('- End with a question or helpful tip if appropriate');
+    buffer.writeln(
+      '- Remind user they can order by saying "order the 1st one" or "order [coffee name]"',
+    );
 
     return buffer.toString();
   }
@@ -388,9 +403,307 @@ No matching coffee items found in the database. Provide general coffee recommend
     return text[0].toUpperCase() + text.substring(1);
   }
 
+  // ==================== ORDER HANDLING METHODS ====================
+
+  /// Check if the message is an order intent
+  bool _isOrderIntent(String message) {
+    final lower = message.toLowerCase();
+
+    // Order keywords
+    final orderKeywords = [
+      'order',
+      'buy',
+      'purchase',
+      'get me',
+      'i want',
+      "i'll take",
+      'i will take',
+      'give me',
+      'can i get',
+      'can i have',
+      'place order',
+    ];
+
+    return orderKeywords.any((kw) => lower.contains(kw));
+  }
+
+  /// Parse the order intent to find which item user wants
+  CoffeeRecommendation? _parseOrderItem(String message) {
+    if (_lastRecommendations.isEmpty) return null;
+
+    final lower = message.toLowerCase();
+
+    // Check for ordinal references (1st, 2nd, first, second, etc.)
+    final ordinalPatterns = {
+      RegExp(r'\b(1st|first|1|one)\b'): 0,
+      RegExp(r'\b(2nd|second|2|two)\b'): 1,
+      RegExp(r'\b(3rd|third|3|three)\b'): 2,
+      RegExp(r'\b(4th|fourth|4|four)\b'): 3,
+      RegExp(r'\b(5th|fifth|5|five)\b'): 4,
+    };
+
+    for (final entry in ordinalPatterns.entries) {
+      if (entry.key.hasMatch(lower)) {
+        final index = entry.value;
+        if (index < _lastRecommendations.length) {
+          return _lastRecommendations[index];
+        }
+      }
+    }
+
+    // Check for item name match
+    for (final rec in _lastRecommendations) {
+      final itemName = rec.item.name.toLowerCase();
+      if (lower.contains(itemName) ||
+          itemName
+              .split(' ')
+              .any((word) => lower.contains(word) && word.length > 3)) {
+        return rec;
+      }
+    }
+
+    return null;
+  }
+
+  /// Start the order flow for a selected item
+  void startOrderFlow(CoffeeRecommendation item) {
+    final subtotal = item.item.basePrice;
+    final rewardPoints = _orderService.calculateRewardPoints(subtotal);
+
+    _chatOrderData = ChatOrderData(
+      state: ChatOrderState.selectingMode,
+      selectedItem: item,
+      subtotal: subtotal,
+      rewardPoints: rewardPoints,
+    );
+
+    // Add AI message about the order
+    addMessage(
+      AIChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        message:
+            "Great choice! You've selected **${item.item.name}** from ${item.cafe?.name ?? 'the café'}. How would you like to receive your order? ☕",
+        timestamp: DateTime.now(),
+        isAI: true,
+      ),
+    );
+
+    notifyListeners();
+  }
+
+  /// Select order mode (dine-in or delivery)
+  void selectOrderMode(OrderMode mode) {
+    if (_chatOrderData.selectedItem == null) return;
+
+    final subtotal = _chatOrderData.subtotal;
+    final deliveryFee = mode == OrderMode.delivery
+        ? OrderService.deliveryFee
+        : 0.0;
+    final total = subtotal + deliveryFee;
+    final rewardPoints = _orderService.calculateRewardPoints(subtotal);
+
+    _chatOrderData = _chatOrderData.copyWith(
+      state: ChatOrderState.confirmingOrder,
+      orderMode: mode,
+      deliveryFee: deliveryFee,
+      total: total,
+      rewardPoints: rewardPoints,
+    );
+
+    final modeText = mode == OrderMode.delivery ? 'Delivery' : 'Dine-in';
+    addMessage(
+      AIChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        message:
+            "Perfect! You've chosen **$modeText**. Please review your order summary and confirm when ready! 🎉",
+        timestamp: DateTime.now(),
+        isAI: true,
+      ),
+    );
+
+    notifyListeners();
+  }
+
+  /// Update delivery address
+  void updateDeliveryAddress(String address) {
+    _chatOrderData = _chatOrderData.copyWith(deliveryAddress: address);
+    notifyListeners();
+  }
+
+  /// Cancel the current order flow
+  void cancelChatOrder() {
+    _chatOrderData = ChatOrderData.initial();
+
+    addMessage(
+      AIChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        message:
+            "No worries! Order cancelled. Is there anything else I can help you with? ☕",
+        timestamp: DateTime.now(),
+        isAI: true,
+      ),
+    );
+
+    notifyListeners();
+  }
+
+  /// Confirm and place the order
+  Future<void> confirmChatOrder() async {
+    final orderData = _chatOrderData;
+    final item = orderData.selectedItem;
+
+    if (item == null || orderData.orderMode == null) {
+      addMessage(
+        AIChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          message: "Sorry, something went wrong. Please try ordering again.",
+          timestamp: DateTime.now(),
+          isAI: true,
+        ),
+      );
+      _chatOrderData = ChatOrderData.initial();
+      notifyListeners();
+      return;
+    }
+
+    // Set processing state
+    _chatOrderData = orderData.copyWith(state: ChatOrderState.processing);
+    notifyListeners();
+
+    try {
+      // Get cafe info for the order
+      final cafeId = item.item.cafeId;
+      String cafeName = item.cafe?.name ?? 'Unknown Café';
+      String ownerAdminId = '';
+
+      // Fetch ownerAdminId from cafe document
+      try {
+        final cafeDoc = await firebase.cafesCollection.doc(cafeId).get();
+        if (cafeDoc.exists) {
+          final cafeData = cafeDoc.data() as Map<String, dynamic>;
+          ownerAdminId = cafeData['ownerAdminId'] ?? '';
+          cafeName = cafeData['name'] ?? cafeName;
+        }
+      } catch (e) {
+        debugPrint('Error fetching cafe info: $e');
+      }
+
+      // Create the order
+      await _orderService.createAIOrder(
+        menuItem: item.item,
+        cafeId: cafeId,
+        cafeName: cafeName,
+        ownerAdminId: ownerAdminId,
+        orderMode: orderData.orderMode!,
+        deliveryAddress: orderData.orderMode == OrderMode.delivery
+            ? orderData.deliveryAddress
+            : null,
+      );
+
+      // Success!
+      _chatOrderData = orderData.copyWith(state: ChatOrderState.completed);
+
+      final modeEmoji = orderData.orderMode == OrderMode.delivery
+          ? '🚗'
+          : '🍽️';
+      addMessage(
+        AIChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          message:
+              '''🎉 **Order Placed Successfully!**
+
+Your **${item.item.name}** has been ordered from **$cafeName**!
+
+$modeEmoji **Order Mode:** ${orderData.orderMode == OrderMode.delivery ? 'Delivery' : 'Dine-in'}
+💰 **Total:** ${orderData.total.toStringAsFixed(0)} TK
+⭐ **Points Earned:** ${orderData.rewardPoints} points
+
+Your order is being prepared. You can track it in the Orders section. Enjoy your coffee! ☕✨''',
+          timestamp: DateTime.now(),
+          isAI: true,
+        ),
+      );
+
+      // Reset order state after short delay
+      await Future.delayed(const Duration(milliseconds: 500));
+      _chatOrderData = ChatOrderData.initial();
+    } catch (e) {
+      debugPrint('Error placing order: $e');
+      _chatOrderData = orderData.copyWith(
+        state: ChatOrderState.error,
+        errorMessage: e.toString(),
+      );
+
+      addMessage(
+        AIChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          message:
+              "😔 Sorry, there was an error placing your order: ${e.toString().replaceAll('Exception: ', '')}. Please try again or place your order through the cart.",
+          timestamp: DateTime.now(),
+          isAI: true,
+        ),
+      );
+
+      // Reset order state
+      await Future.delayed(const Duration(seconds: 1));
+      _chatOrderData = ChatOrderData.initial();
+    }
+
+    notifyListeners();
+  }
+
+  /// Handle order intent from user message
+  Future<bool> _handleOrderIntent(String message) async {
+    if (!_isOrderIntent(message)) return false;
+
+    // Parse which item user wants to order
+    final item = _parseOrderItem(message);
+
+    if (item != null) {
+      // Start order flow with the item
+      startOrderFlow(item);
+      return true;
+    } else if (_lastRecommendations.isNotEmpty) {
+      // User wants to order but didn't specify which item
+      addMessage(
+        AIChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          message: '''I see you want to place an order! 🛒
+
+Which coffee would you like? You can say:
+- "Order the 1st one" or "Order the first coffee"
+- "Order [coffee name]"
+
+Or tap the cart icon on any coffee card to add it to your cart! ☕''',
+          timestamp: DateTime.now(),
+          isAI: true,
+        ),
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  // ==================== END ORDER HANDLING ====================
+
   // Send message and get AI response
   Future<void> sendMessage(String userMessage) async {
     if (userMessage.trim().isEmpty || !_isInitialized) return;
+
+    // If there's an active order flow, don't process as regular message
+    if (_chatOrderData.isActive) {
+      // User might be cancelling or confirming
+      final lower = userMessage.toLowerCase();
+      if (lower.contains('cancel') ||
+          lower.contains('no') ||
+          lower.contains('stop')) {
+        cancelChatOrder();
+        return;
+      }
+      // Otherwise ignore regular messages during order flow
+      return;
+    }
 
     // Add user message
     final userChatMessage = AIChatMessage(
@@ -400,6 +713,11 @@ No matching coffee items found in the database. Provide general coffee recommend
       isAI: false,
     );
     addMessage(userChatMessage);
+
+    // Check for order intent first
+    if (await _handleOrderIntent(userMessage)) {
+      return;
+    }
 
     // Show loading
     _isLoading = true;
@@ -501,6 +819,12 @@ Note: User profile not available. Provide general coffee recommendations and sug
       // Get AI response
       final aiResponse = await _aiService.sendMessage(messageToSend);
 
+      // Store recommendations for order reference
+      if (_pendingRecommendations != null &&
+          _pendingRecommendations!.isNotEmpty) {
+        _lastRecommendations = List.from(_pendingRecommendations!);
+      }
+
       // Add recommendations to the AI response if we have them
       final responseWithRecommendations = AIChatMessage(
         id: aiResponse.id,
@@ -531,6 +855,8 @@ Note: User profile not available. Provide general coffee recommendations and sug
   // Clear all messages
   Future<void> clearMessages() async {
     _messages.clear();
+    _lastRecommendations.clear();
+    _chatOrderData = ChatOrderData.initial();
     _aiService.resetChat();
     await _saveMessages();
     notifyListeners();

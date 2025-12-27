@@ -62,18 +62,9 @@ class UserProfileService {
     Map<String, dynamic> data = {
       if (displayName != null) 'displayName': displayName,
       if (photoUrl != null) 'photoUrl': photoUrl,
+      if (preferences != null) 'preferences': preferences,
       'updatedAt': FieldValue.serverTimestamp(),
     };
-
-    // Merge preferences with existing ones if updating preferences
-    if (preferences != null) {
-      final currentDoc = await docRef.get();
-      final currentData = currentDoc.data();
-      final existingPreferences =
-          (currentData?['preferences'] as Map<String, dynamic>?) ?? {};
-      existingPreferences.addAll(preferences);
-      data['preferences'] = existingPreferences;
-    }
 
     if (data.keys.length == 1) return; // only updatedAt would be set
 

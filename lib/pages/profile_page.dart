@@ -74,22 +74,17 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile(BuildContext bottomSheetContext) async {
     setState(() => _saving = true);
     try {
-      final Map<String, dynamic> preferences = {};
-      if (_selectedCoffeeTypes.isNotEmpty) {
-        preferences['coffeeTypes'] = _selectedCoffeeTypes;
-      }
-      if (_selectedCoffeeStrength != null) {
-        preferences['coffeeStrength'] = _selectedCoffeeStrength;
-      }
-      if (_selectedTasteProfiles.isNotEmpty) {
-        preferences['tasteProfiles'] = _selectedTasteProfiles;
-      }
+      final Map<String, dynamic> preferences = {
+        'coffeeTypes': _selectedCoffeeTypes,
+        'coffeeStrength': _selectedCoffeeStrength,
+        'tasteProfiles': _selectedTasteProfiles,
+      };
 
       await _profileService.updateProfile(
         displayName: _displayNameCtrl.text.trim().isEmpty
             ? null
             : _displayNameCtrl.text.trim(),
-        preferences: preferences.isEmpty ? null : preferences,
+        preferences: preferences,
       );
       if (!mounted) return;
       Navigator.of(bottomSheetContext).pop();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ai_chat_message_model.dart';
 import '../services/cart_service.dart';
+import '../services/ai_chat_state_service.dart';
 import '../theme/brand_colors.dart';
 
 /// A beautiful coffee recommendation card for the chat interface
@@ -318,32 +319,69 @@ class ChatCoffeeCard extends StatelessWidget {
   }
 
   Widget _buildAddButton(BuildContext context) {
-    return Material(
-      color: BrandColors.mocha,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          final cartService = context.read<CartService>();
-          cartService.addToCart(recommendation.item);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${recommendation.item.name} added to cart'),
-              backgroundColor: BrandColors.mocha,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Add to cart button
+        Material(
+          color: BrandColors.mocha.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            onTap: () {
+              final cartService = context.read<CartService>();
+              cartService.addToCart(recommendation.item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${recommendation.item.name} added to cart'),
+                  backgroundColor: BrandColors.mocha,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                Icons.add_shopping_cart_rounded,
+                size: 18,
+                color: BrandColors.mocha,
+              ),
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          child: const Icon(
-            Icons.add_shopping_cart_rounded,
-            size: 20,
-            color: Colors.white,
           ),
         ),
-      ),
+        const SizedBox(width: 6),
+        // Quick order button
+        Material(
+          color: BrandColors.caramel,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            onTap: () {
+              final chatService = context.read<AIChatStateService>();
+              chatService.startOrderFlow(recommendation);
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bolt_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'Order',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -462,7 +500,7 @@ class ChatCoffeeCardList extends StatelessWidget {
         ),
         // Scrollable cards
         SizedBox(
-          height: 400,
+          height: 420,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
