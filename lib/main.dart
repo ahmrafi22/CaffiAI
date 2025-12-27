@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'pages/home_page.dart';
@@ -9,13 +10,20 @@ import 'pages/profile_page.dart';
 import 'pages/chat_page.dart';
 import 'services/cart_service.dart';
 import 'services/order_service.dart';
+import 'services/ai_chat_state_service.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/brand_logo_title.dart';
 import 'theme/brand_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+
+  // Initialize Firebase
   await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 
@@ -28,6 +36,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (context) => CartService()),
         ChangeNotifierProvider(create: (context) => OrderService()),
+        ChangeNotifierProvider(create: (context) => AIChatStateService()),
       ],
       child: MaterialApp(
         title: 'CaffiAI',

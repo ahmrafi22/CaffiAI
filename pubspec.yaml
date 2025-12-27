@@ -49,6 +49,8 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^3.0.0
   permission_handler: ^11.3.1
+  google_generative_ai: ^0.4.6
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +76,7 @@ flutter:
   assets:
     - images/cafe_logo.svg
     - assets/fonts/
+    - .env
     # placeholder asset removed (file not present). Add real assets as needed.
 
   fonts:
