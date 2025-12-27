@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ai_chat_message_model.dart';
+import '../models/user_profile_model.dart';
+import '../models/menu_item_model.dart';
+import '../models/cafe_model.dart';
 import 'ai_chat_service.dart';
 import 'weather_service.dart';
 import 'location_state_service.dart';
+import 'firebase_service.dart';
 
 class AIChatStateService extends ChangeNotifier {
   static const String _messagesKey = 'ai_chat_messages';
@@ -122,6 +127,255 @@ class AIChatStateService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Check if the query is about coffee suggestions (non-weather related)
+  bool _isCoffeeSuggestionQuery(String message) {
+    final lower = message.toLowerCase();
+
+    // Keywords for coffee suggestions
+    final suggestionKeywords = [
+      'suggest',
+      'recommend',
+      'coffee',
+      'drink',
+      'beverage',
+      'what should i',
+      'what can i',
+      'help me choose',
+      'pick',
+    ];
+
+    // Context keywords (mood, time, occasion, etc.)
+    final contextKeywords = [
+      'mood',
+      'feeling',
+      'tired',
+      'energetic',
+      'relaxed',
+      'stressed',
+      'morning',
+      'afternoon',
+      'evening',
+      'night',
+      'breakfast',
+      'lunch',
+      'study',
+      'work',
+      'meeting',
+      'date',
+      'quick',
+      'strong',
+      'light',
+      'sweet',
+      'bitter',
+      'creamy',
+      'smooth',
+      'energize',
+      'focus',
+    ];
+
+    final hasSuggestionKeyword = suggestionKeywords.any(
+      (kw) => lower.contains(kw),
+    );
+    final hasContextKeyword = contextKeywords.any((kw) => lower.contains(kw));
+
+    return hasSuggestionKeyword || hasContextKeyword;
+  }
+
+  /// Fetch user profile preferences
+  Future<UserProfile?> _getUserProfile() async {
+    final user = firebase.currentUser;
+    if (user == null) return null;
+
+    try {
+      final doc = await firebase.usersCollection.doc(user.uid).get();
+      if (doc.exists) {
+        return UserProfile.fromDoc(doc);
+      }
+    } catch (e) {
+      debugPrint('Error fetching user profile: $e');
+    }
+    return null;
+  }
+
+  /// Query coffee items matching user preferences
+  Future<List<Map<String, dynamic>>> _queryCoffeeItems(
+    UserProfile profile,
+  ) async {
+    try {
+      // Get all coffee items from all cafes
+      final snapshot = await FirebaseFirestore.instance
+          .collection('menuItems')
+          .where('category', isEqualTo: 'coffee')
+          .where('isAvailable', isEqualTo: true)
+          .limit(20)
+          .get();
+
+      if (snapshot.docs.isEmpty) return [];
+
+      // Convert to menu items and score them based on preferences
+      final items = snapshot.docs
+          .map((doc) => MenuItem.fromFirestore(doc))
+          .toList();
+      final scoredItems = <Map<String, dynamic>>[];
+
+      for (final item in items) {
+        int score = 0;
+
+        // Match subcategory (coffee type)
+        if (profile.coffeeTypes.isNotEmpty) {
+          final itemSubcategory = item.subcategory.toLowerCase();
+          for (final prefType in profile.coffeeTypes) {
+            if (itemSubcategory.contains(prefType.toLowerCase()) ||
+                prefType.toLowerCase().contains(itemSubcategory)) {
+              score += 3;
+              break;
+            }
+          }
+        }
+
+        // Match strength
+        if (profile.coffeeStrength != null && item.strength != null) {
+          if (item.strength!.toLowerCase() ==
+              profile.coffeeStrength!.toLowerCase()) {
+            score += 2;
+          }
+        }
+
+        // Match taste profiles
+        if (profile.tasteProfiles.isNotEmpty && item.tasteProfile.isNotEmpty) {
+          for (final prefTaste in profile.tasteProfiles) {
+            for (final itemTaste in item.tasteProfile) {
+              if (itemTaste.toLowerCase() == prefTaste.toLowerCase()) {
+                score += 2;
+              }
+            }
+          }
+        }
+
+        // If no preferences set, include all items with base score
+        if (profile.coffeeTypes.isEmpty &&
+            profile.coffeeStrength == null &&
+            profile.tasteProfiles.isEmpty) {
+          score = 1;
+        }
+
+        if (score > 0) {
+          // Get cafe info
+          Cafe? cafe;
+          try {
+            final cafeDoc = await firebase.cafesCollection
+                .doc(item.cafeId)
+                .get();
+            if (cafeDoc.exists) {
+              cafe = Cafe.fromFirestore(cafeDoc);
+            }
+          } catch (e) {
+            debugPrint('Error fetching cafe: $e');
+          }
+
+          scoredItems.add({'item': item, 'cafe': cafe, 'score': score});
+        }
+      }
+
+      // Sort by score (descending)
+      scoredItems.sort(
+        (a, b) => (b['score'] as int).compareTo(a['score'] as int),
+      );
+
+      // Return top 5
+      return scoredItems.take(5).toList();
+    } catch (e) {
+      debugPrint('Error querying coffee items: $e');
+      return [];
+    }
+  }
+
+  /// Format coffee recommendations for AI context
+  String _formatCoffeeRecommendations(
+    List<Map<String, dynamic>> recommendations,
+    UserProfile profile,
+  ) {
+    if (recommendations.isEmpty) {
+      return '''User Preferences: ${_formatUserPreferences(profile)}
+
+No matching coffee items found in the database. Provide general coffee recommendations based on the user's preferences.''';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('User Preferences: ${_formatUserPreferences(profile)}');
+    buffer.writeln();
+    buffer.writeln(
+      'AVAILABLE COFFEE ITEMS FROM DATABASE (ranked by preference match):',
+    );
+    buffer.writeln();
+
+    for (int i = 0; i < recommendations.length; i++) {
+      final data = recommendations[i];
+      final MenuItem item = data['item'];
+      final Cafe? cafe = data['cafe'];
+      final int score = data['score'];
+
+      buffer.writeln('${i + 1}. **${item.name}**');
+      if (cafe != null) {
+        buffer.writeln('   Café: ${cafe.name}');
+        buffer.writeln('   Location: ${cafe.address}, ${cafe.city}');
+      }
+      buffer.writeln('   Type: ${_capitalize(item.subcategory)}');
+      if (item.strength != null) {
+        buffer.writeln('   Strength: ${_capitalize(item.strength!)}');
+      }
+      if (item.tasteProfile.isNotEmpty) {
+        buffer.writeln(
+          '   Taste: ${item.tasteProfile.map(_capitalize).join(", ")}',
+        );
+      }
+      if (item.bestTime.isNotEmpty) {
+        buffer.writeln(
+          '   Best Time: ${item.bestTime.map(_capitalize).join(", ")}',
+        );
+      }
+      buffer.writeln('   Price: ${item.basePrice.toStringAsFixed(0)} TK');
+      if (item.description != null && item.description!.isNotEmpty) {
+        buffer.writeln('   Description: ${item.description}');
+      }
+      buffer.writeln('   Match Score: $score');
+      buffer.writeln();
+    }
+
+    buffer.writeln();
+    buffer.writeln('INSTRUCTIONS:');
+    buffer.writeln(
+      '- Present these REAL coffee options from our database to the user',
+    );
+    buffer.writeln('- Mention the specific coffee names, cafés, and details');
+    buffer.writeln(
+      '- Explain WHY each option matches their query/mood/preferences',
+    );
+    buffer.writeln('- Be enthusiastic and helpful in your recommendations');
+    buffer.writeln('- Use the match scores to prioritize recommendations');
+
+    return buffer.toString();
+  }
+
+  String _formatUserPreferences(UserProfile profile) {
+    final prefs = <String>[];
+    if (profile.coffeeTypes.isNotEmpty) {
+      prefs.add('Types: ${profile.coffeeTypes.join(", ")}');
+    }
+    if (profile.coffeeStrength != null) {
+      prefs.add('Strength: ${profile.coffeeStrength}');
+    }
+    if (profile.tasteProfiles.isNotEmpty) {
+      prefs.add('Taste: ${profile.tasteProfiles.join(", ")}');
+    }
+    return prefs.isEmpty ? 'No preferences set' : prefs.join(' | ');
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
   // Send message and get AI response
   Future<void> sendMessage(String userMessage) async {
     if (userMessage.trim().isEmpty || !_isInitialized) return;
@@ -159,6 +413,10 @@ class AIChatStateService extends ChangeNotifier {
           (lowerMessage.contains('recommend') &&
               (lowerMessage.contains('today') || lowerMessage.contains('now')));
 
+      // Check if it's a coffee suggestion query (non-weather)
+      final isCoffeeSuggestion =
+          !isWeatherRelated && _isCoffeeSuggestionQuery(lowerMessage);
+
       // If weather-related and we have location, fetch weather and add context
       if (isWeatherRelated) {
         debugPrint('Weather-related query detected');
@@ -194,6 +452,34 @@ You MUST use this weather information to give personalized coffee recommendation
 User's question: $messageToSend
 
 Note: I don't have access to the user's current location/weather. Ask them to enable location services or tell you their weather conditions so you can make appropriate suggestions.''';
+        }
+      } else if (isCoffeeSuggestion) {
+        // Handle coffee suggestions based on user preferences and database
+        debugPrint('Coffee suggestion query detected (non-weather)');
+
+        final profile = await _getUserProfile();
+
+        if (profile != null) {
+          debugPrint('User profile fetched');
+
+          // Query coffee items matching user preferences
+          final recommendations = await _queryCoffeeItems(profile);
+          debugPrint('Found ${recommendations.length} matching coffee items');
+
+          // Format recommendations for AI
+          final coffeeContext = _formatCoffeeRecommendations(
+            recommendations,
+            profile,
+          );
+
+          messageToSend = '''User's question: $messageToSend
+
+$coffeeContext''';
+        } else {
+          debugPrint('No user profile found or user not logged in');
+          messageToSend = '''User's question: $messageToSend
+
+Note: User profile not available. Provide general coffee recommendations and suggest they create a profile for personalized suggestions.''';
         }
       }
 
