@@ -14,10 +14,55 @@ import 'location_state_service.dart';
 import 'order_service.dart';
 import 'firebase_service.dart';
 
+/// Holds extracted coffee criteria from user's message
+class ExplicitCoffeeCriteria {
+  final List<String> subcategories;
+  final List<String> strengths;
+  final List<String> tasteProfiles;
+
+  ExplicitCoffeeCriteria({
+    this.subcategories = const [],
+    this.strengths = const [],
+    this.tasteProfiles = const [],
+  });
+
+  bool get hasAnyCriteria =>
+      subcategories.isNotEmpty ||
+      strengths.isNotEmpty ||
+      tasteProfiles.isNotEmpty;
+
+  @override
+  String toString() =>
+      'ExplicitCoffeeCriteria(subcategories: $subcategories, strengths: $strengths, tasteProfiles: $tasteProfiles)';
+}
+
 class AIChatStateService extends ChangeNotifier {
   static const String _messagesKey = 'ai_chat_messages';
   final AIChatService _aiService = AIChatService();
   final OrderService _orderService = OrderService();
+
+  // Coffee criteria constants
+  static const List<String> _validSubcategories = [
+    'black coffee',
+    'espresso',
+    'latte',
+    'cappuccino',
+    'americano',
+    'mocha',
+  ];
+
+  static const List<String> _validStrengths = ['light', 'medium', 'strong'];
+
+  static const List<String> _validTasteProfiles = [
+    'sweet',
+    'bitter',
+    'creamy',
+    'chocolatey',
+    'fruity',
+    'nutty',
+    'spicy',
+    'sour',
+  ];
 
   // Reference to location service (will be set from outside)
   LocationStateService? _locationService;
@@ -152,9 +197,73 @@ class AIChatStateService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Extract explicit coffee criteria from user's message
+  ExplicitCoffeeCriteria _extractExplicitCriteria(String message) {
+    final lower = message.toLowerCase();
+    final foundSubcategories = <String>[];
+    final foundStrengths = <String>[];
+    final foundTasteProfiles = <String>[];
+
+    // Check for subcategories
+    for (final subcat in _validSubcategories) {
+      if (lower.contains(subcat)) {
+        foundSubcategories.add(subcat);
+      }
+    }
+    // Also check for single-word variants
+    if (lower.contains('espresso') &&
+        !foundSubcategories.contains('espresso')) {
+      foundSubcategories.add('espresso');
+    }
+    if (lower.contains('latte') && !foundSubcategories.contains('latte')) {
+      foundSubcategories.add('latte');
+    }
+    if (lower.contains('cappuccino') &&
+        !foundSubcategories.contains('cappuccino')) {
+      foundSubcategories.add('cappuccino');
+    }
+    if (lower.contains('americano') &&
+        !foundSubcategories.contains('americano')) {
+      foundSubcategories.add('americano');
+    }
+    if (lower.contains('mocha') && !foundSubcategories.contains('mocha')) {
+      foundSubcategories.add('mocha');
+    }
+    if ((lower.contains('black') && lower.contains('coffee')) &&
+        !foundSubcategories.contains('black coffee')) {
+      foundSubcategories.add('black coffee');
+    }
+
+    // Check for strengths
+    for (final strength in _validStrengths) {
+      if (lower.contains(strength)) {
+        foundStrengths.add(strength);
+      }
+    }
+
+    // Check for taste profiles
+    for (final taste in _validTasteProfiles) {
+      if (lower.contains(taste)) {
+        foundTasteProfiles.add(taste);
+      }
+    }
+
+    return ExplicitCoffeeCriteria(
+      subcategories: foundSubcategories,
+      strengths: foundStrengths,
+      tasteProfiles: foundTasteProfiles,
+    );
+  }
+
   /// Check if the query is about coffee suggestions (non-weather related)
   bool _isCoffeeSuggestionQuery(String message) {
     final lower = message.toLowerCase();
+
+    // First check if explicit criteria are present
+    final explicitCriteria = _extractExplicitCriteria(message);
+    if (explicitCriteria.hasAnyCriteria) {
+      return true;
+    }
 
     // Keywords for coffee suggestions
     final suggestionKeywords = [
@@ -188,11 +297,6 @@ class AIChatStateService extends ChangeNotifier {
       'meeting',
       'date',
       'quick',
-      'strong',
-      'light',
-      'sweet',
-      'bitter',
-      'creamy',
       'smooth',
       'energize',
       'focus',
@@ -220,6 +324,182 @@ class AIChatStateService extends ChangeNotifier {
       debugPrint('Error fetching user profile: $e');
     }
     return null;
+  }
+
+  /// Query coffee items matching explicit criteria from user message
+  Future<List<CoffeeRecommendation>> _queryCoffeeItemsByExplicitCriteria(
+    ExplicitCoffeeCriteria criteria,
+  ) async {
+    try {
+      // Get all coffee items from all cafes
+      final snapshot = await FirebaseFirestore.instance
+          .collection('menuItems')
+          .where('category', isEqualTo: 'coffee')
+          .where('isAvailable', isEqualTo: true)
+          .limit(30)
+          .get();
+
+      if (snapshot.docs.isEmpty) return [];
+
+      // Convert to menu items and score them based on explicit criteria
+      final items = snapshot.docs
+          .map((doc) => MenuItem.fromFirestore(doc))
+          .toList();
+      final scoredItems = <CoffeeRecommendation>[];
+
+      for (final item in items) {
+        int score = 0;
+
+        // Match subcategory
+        if (criteria.subcategories.isNotEmpty) {
+          final itemSubcategory = item.subcategory.toLowerCase();
+          for (final subcat in criteria.subcategories) {
+            if (itemSubcategory.contains(subcat.toLowerCase()) ||
+                subcat.toLowerCase().contains(itemSubcategory)) {
+              score += 5; // Higher weight for explicit subcategory match
+              break;
+            }
+          }
+        }
+
+        // Match strength
+        if (criteria.strengths.isNotEmpty && item.strength != null) {
+          final itemStrength = item.strength!.toLowerCase();
+          for (final strength in criteria.strengths) {
+            if (itemStrength == strength.toLowerCase()) {
+              score += 3;
+              break;
+            }
+          }
+        }
+
+        // Match taste profiles
+        if (criteria.tasteProfiles.isNotEmpty && item.tasteProfile.isNotEmpty) {
+          for (final taste in criteria.tasteProfiles) {
+            for (final itemTaste in item.tasteProfile) {
+              if (itemTaste.toLowerCase() == taste.toLowerCase()) {
+                score += 3;
+              }
+            }
+          }
+        }
+
+        // Only include items with matching score
+        if (score > 0) {
+          // Get cafe info
+          Cafe? cafe;
+          try {
+            final cafeDoc = await firebase.cafesCollection
+                .doc(item.cafeId)
+                .get();
+            if (cafeDoc.exists) {
+              cafe = Cafe.fromFirestore(cafeDoc);
+            }
+          } catch (e) {
+            debugPrint('Error fetching cafe: $e');
+          }
+
+          scoredItems.add(
+            CoffeeRecommendation(item: item, cafe: cafe, matchScore: score),
+          );
+        }
+      }
+
+      // Sort by score (descending)
+      scoredItems.sort((a, b) => b.matchScore.compareTo(a.matchScore));
+
+      // Return top 5
+      return scoredItems.take(5).toList();
+    } catch (e) {
+      debugPrint('Error querying coffee items by explicit criteria: $e');
+      return [];
+    }
+  }
+
+  /// Format explicit criteria for AI context
+  String _formatExplicitCriteria(ExplicitCoffeeCriteria criteria) {
+    final parts = <String>[];
+    if (criteria.subcategories.isNotEmpty) {
+      parts.add('Types: ${criteria.subcategories.join(", ")}');
+    }
+    if (criteria.strengths.isNotEmpty) {
+      parts.add('Strength: ${criteria.strengths.join(", ")}');
+    }
+    if (criteria.tasteProfiles.isNotEmpty) {
+      parts.add('Taste: ${criteria.tasteProfiles.join(", ")}');
+    }
+    return parts.isEmpty ? 'No specific criteria' : parts.join(' | ');
+  }
+
+  /// Format coffee recommendations for AI context (explicit criteria version)
+  String _formatCoffeeRecommendationsExplicit(
+    List<CoffeeRecommendation> recommendations,
+    ExplicitCoffeeCriteria criteria,
+  ) {
+    if (recommendations.isEmpty) {
+      return '''User's Requested Criteria: ${_formatExplicitCriteria(criteria)}
+
+No matching coffee items found in the database. Suggest alternatives or ask for more details.''';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln(
+      'User\'s Requested Criteria: ${_formatExplicitCriteria(criteria)}',
+    );
+    buffer.writeln();
+    buffer.writeln(
+      'AVAILABLE COFFEE ITEMS FROM DATABASE (ranked by criteria match):',
+    );
+    buffer.writeln();
+
+    for (int i = 0; i < recommendations.length; i++) {
+      final rec = recommendations[i];
+      final item = rec.item;
+      final cafe = rec.cafe;
+
+      buffer.writeln('${i + 1}. **${item.name}**');
+      if (cafe != null) {
+        buffer.writeln('   Café: ${cafe.name}');
+        buffer.writeln('   Location: ${cafe.address}, ${cafe.city}');
+      }
+      buffer.writeln('   Type: ${_capitalize(item.subcategory)}');
+      if (item.strength != null) {
+        buffer.writeln('   Strength: ${_capitalize(item.strength!)}');
+      }
+      if (item.tasteProfile.isNotEmpty) {
+        buffer.writeln(
+          '   Taste: ${item.tasteProfile.map((t) => _capitalize(t)).join(", ")}',
+        );
+      }
+      if (item.bestTime.isNotEmpty) {
+        buffer.writeln(
+          '   Best Time: ${item.bestTime.map((t) => _capitalize(t)).join(", ")}',
+        );
+      }
+      buffer.writeln('   Price: ${item.basePrice.toStringAsFixed(0)} TK');
+      if (item.description != null && item.description!.isNotEmpty) {
+        buffer.writeln('   Description: ${item.description}');
+      }
+      buffer.writeln('   Match Score: ${rec.matchScore}');
+      buffer.writeln();
+    }
+
+    buffer.writeln();
+    buffer.writeln('INSTRUCTIONS:');
+    buffer.writeln(
+      '- Give a SHORT, friendly intro about why these coffees match the user\'s request',
+    );
+    buffer.writeln(
+      '- DO NOT list coffee details - they will be shown as product cards',
+    );
+    buffer.writeln('- Mention 1-2 coffee names briefly to highlight top picks');
+    buffer.writeln('- Keep response concise (2-3 sentences max)');
+    buffer.writeln('- End with a question or helpful tip if appropriate');
+    buffer.writeln(
+      '- Remind user they can order by saying "order the 1st one" or "order [coffee name]"',
+    );
+
+    return buffer.toString();
   }
 
   /// Query coffee items matching user preferences
@@ -784,35 +1064,66 @@ User's question: $messageToSend
 Note: I don't have access to the user's current location/weather. Ask them to enable location services or tell you their weather conditions so you can make appropriate suggestions.''';
         }
       } else if (isCoffeeSuggestion) {
-        // Handle coffee suggestions based on user preferences and database
+        // Handle coffee suggestions
         debugPrint('Coffee suggestion query detected (non-weather)');
 
-        final profile = await _getUserProfile();
+        // First, check for explicit coffee criteria in the message
+        final explicitCriteria = _extractExplicitCriteria(messageToSend);
 
-        if (profile != null) {
-          debugPrint('User profile fetched');
+        if (explicitCriteria.hasAnyCriteria) {
+          // User specified explicit criteria - use those instead of preferences
+          debugPrint('Explicit criteria found: $explicitCriteria');
 
-          // Query coffee items matching user preferences
-          final recommendations = await _queryCoffeeItems(profile);
-          debugPrint('Found ${recommendations.length} matching coffee items');
+          // Query coffee items matching explicit criteria
+          final recommendations = await _queryCoffeeItemsByExplicitCriteria(
+            explicitCriteria,
+          );
+          debugPrint(
+            'Found ${recommendations.length} matching coffee items by explicit criteria',
+          );
 
           // Store recommendations for use in AI response
           _pendingRecommendations = recommendations;
 
           // Format recommendations for AI
-          final coffeeContext = _formatCoffeeRecommendations(
+          final coffeeContext = _formatCoffeeRecommendationsExplicit(
             recommendations,
-            profile,
+            explicitCriteria,
           );
 
           messageToSend = '''User's question: $messageToSend
 
 $coffeeContext''';
         } else {
-          debugPrint('No user profile found or user not logged in');
-          messageToSend = '''User's question: $messageToSend
+          // No explicit criteria - fall back to user preferences
+          debugPrint('No explicit criteria, using user preferences');
+          final profile = await _getUserProfile();
+
+          if (profile != null) {
+            debugPrint('User profile fetched');
+
+            // Query coffee items matching user preferences
+            final recommendations = await _queryCoffeeItems(profile);
+            debugPrint('Found ${recommendations.length} matching coffee items');
+
+            // Store recommendations for use in AI response
+            _pendingRecommendations = recommendations;
+
+            // Format recommendations for AI
+            final coffeeContext = _formatCoffeeRecommendations(
+              recommendations,
+              profile,
+            );
+
+            messageToSend = '''User's question: $messageToSend
+
+$coffeeContext''';
+          } else {
+            debugPrint('No user profile found or user not logged in');
+            messageToSend = '''User's question: $messageToSend
 
 Note: User profile not available. Provide general coffee recommendations and suggest they create a profile for personalized suggestions.''';
+          }
         }
       }
 
