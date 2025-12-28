@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../services/order_service.dart';
+import '../services/review_service.dart';
 import '../theme/brand_colors.dart';
+import '../widgets/review_dialog.dart';
 
 class OrdersPage extends StatelessWidget {
   const OrdersPage({super.key});
@@ -348,6 +350,77 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ),
                 ],
+
+                // Review Button (only for completed orders)
+                if (order.status == OrderStatus.completed) ...[
+                  const SizedBox(height: 16),
+                  FutureBuilder<bool>(
+                    future: context.read<ReviewService>().hasUserReviewedOrder(
+                      order.id,
+                    ),
+                    builder: (context, snapshot) {
+                      final hasReviewed = snapshot.data ?? false;
+
+                      if (hasReviewed) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BrandColors.mintGreen.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: BrandColors.mintGreen),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 18,
+                                color: BrandColors.mocha,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Review Submitted',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: BrandColors.mocha,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showReviewDialog(
+                            context,
+                            order.id,
+                            order.cafeId,
+                            order.cafeName,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: BrandColors.caramel,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.rate_review_rounded),
+                          label: const Text(
+                            'Review Cafe',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -490,6 +563,19 @@ class _OrderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showReviewDialog(
+    BuildContext context,
+    String orderId,
+    String cafeId,
+    String cafeName,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) =>
+          ReviewDialog(cafeId: cafeId, cafeName: cafeName, orderId: orderId),
     );
   }
 }

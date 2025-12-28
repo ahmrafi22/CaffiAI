@@ -96,6 +96,25 @@ service cloud.firestore {
       }
     }
 
+    // reviews - users can create reviews for completed orders, anyone can read
+    match /reviews/{reviewId} {
+      // Allow anyone to read reviews (for displaying in cafe pages)
+      allow read: if true;
+      
+      // Allow authenticated users to create reviews (must be their own userId)
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Allow users to delete only their own reviews
+      allow delete: if request.auth != null && 
+                       resource.data.userId == request.auth.uid;
+      
+      // Optionally allow users to update only their own reviews
+      allow update: if request.auth != null && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+    }
+
     match /globalChat/{messageId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null 

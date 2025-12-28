@@ -16,7 +16,14 @@ class AIChatService {
     if (_isInitialized) return;
 
     try {
+      // Force reload of dotenv
+      await dotenv.load(fileName: ".env");
+
       final apiKey = dotenv.env['GEMINI_API_KEY'];
+
+      print(
+        '🔑 API Key loaded (first 10 chars): ${apiKey?.substring(0, 10)}...',
+      );
 
       if (apiKey == null ||
           apiKey.isEmpty ||
@@ -27,7 +34,7 @@ class AIChatService {
       }
 
       _model = GenerativeModel(
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         apiKey: apiKey,
         systemInstruction: Content.system(
           'You are CaffiAI, a friendly and knowledgeable coffee assistant for a café ordering app. '
@@ -89,6 +96,12 @@ class AIChatService {
         isAI: true,
       );
     } catch (e) {
+      print('❌ AI Error: $e');
+      if (e.toString().contains('quota') || e.toString().contains('429')) {
+        throw Exception(
+          'API quota exceeded. Please check your API key and billing status at https://console.cloud.google.com/',
+        );
+      }
       throw Exception('Failed to get AI response: $e');
     }
   }

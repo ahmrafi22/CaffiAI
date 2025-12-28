@@ -10,6 +10,7 @@ import 'pages/profile_page.dart';
 import 'pages/chat_page.dart';
 import 'services/cart_service.dart';
 import 'services/order_service.dart';
+import 'services/review_service.dart';
 import 'services/ai_chat_state_service.dart';
 import 'services/location_state_service.dart';
 import 'widgets/bottom_nav.dart';
@@ -37,6 +38,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (context) => CartService()),
         ChangeNotifierProvider(create: (context) => OrderService()),
+        ChangeNotifierProvider(create: (context) => ReviewService()),
         ChangeNotifierProvider(create: (context) => LocationStateService()),
         ChangeNotifierProvider(create: (context) => AIChatStateService()),
       ],
